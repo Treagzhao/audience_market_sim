@@ -17,6 +17,16 @@ pub struct Agent {
     demand: Arc<RwLock<HashMap<u64, bool>>>,
 }
 
+/// 交易结果枚举
+pub enum TradeResult {
+    /// 未匹配到合适的交易对手
+    NotMatched,
+    /// 交易成功，包含成交价格
+    Success(f64),
+    /// 交易失败，未达成交易
+    Failed,
+}
+
 impl Agent {
     pub fn new(id: u64, name: String, cash: f64) -> Self {
         Agent {
@@ -130,10 +140,10 @@ impl Agent {
         }
     }
     
-    pub fn trade(&mut self, factory:&Factory) -> Option<f64> {
+    pub fn trade(&mut self, factory:&Factory) -> TradeResult {
         let g = self.preferences.write().unwrap();
         if !g.contains_key(&factory.product_id()) {
-            return None;
+            return TradeResult::NotMatched;
         }
         drop(g);
         let merge_range = self.match_factory(factory);
@@ -153,7 +163,7 @@ impl Agent {
                 } else {
                     // cash不在交集范围内，处理交易失败
                     self.handle_trade_failure(factory, product_id);
-                    return None;
+                    return TradeResult::Failed;
                 }
             }
 
@@ -176,12 +186,12 @@ impl Agent {
             min = min.max(0.0);
             
             preference.current_range = (min, max);
-            return Some(price);
+            return TradeResult::Success(price);
         }else{
             // 没有交集，处理交易失败
             self.handle_trade_failure(factory, product_id);
+            return TradeResult::Failed;
         }
-        return None;
     }
 }
 
@@ -329,37 +339,40 @@ mod tests {
         let result = agent.trade(&factory);
         
         // 验证交易成功
-        assert!(result.is_some(), "Trade should succeed with overlapping ranges");
-        
-        // 验证需求被移除
-        {  
-            let demand = agent.demand.read().unwrap();
-            assert!(!demand.contains_key(&product_id), "Demand should be removed after successful trade");
+        match result {
+            TradeResult::Success(_price) => {
+                // 验证需求被移除
+                {  
+                    let demand = agent.demand.read().unwrap();
+                    assert!(!demand.contains_key(&product_id), "Demand should be removed after successful trade");
+                }
+                
+                // 验证current_price和current_range更新
+                let preferences = agent.preferences.read().unwrap();
+                let preference = preferences.get(&product_id).unwrap();
+                
+                // 验证cash减少
+                assert!(agent.cash() < initial_cash, "Cash should decrease after trade");
+                
+                // 验证current_price被更新
+                assert!(preference.current_price > 0.0, "Current price should be updated");
+                
+                // 验证current_range以新价格为中点，范围缩小10%
+                let (new_min, new_max) = preference.current_range;
+                let expected_length = (initial_range.1 - initial_range.0) * 0.9;
+                let actual_length = new_max - new_min;
+                assert!((actual_length - expected_length).abs() < expected_length * 0.1, "Range should be reduced by 10%"); // 允许10%的误差
+                
+                // 验证新范围以交易价格为中点
+                let midpoint = (new_min + new_max) / 2.0;
+                assert!((midpoint - preference.current_price).abs() < 0.001, "Range should be centered at trade price");
+                
+                // 验证范围不小于0
+                assert!(new_min >= 0.0, "Range minimum should be >= 0");
+                assert!(new_max > new_min, "Range maximum should be > minimum");
+            },
+            _ => panic!("Trade should succeed with overlapping ranges")
         }
-        
-        // 验证current_price和current_range更新
-        let preferences = agent.preferences.read().unwrap();
-        let preference = preferences.get(&product_id).unwrap();
-        
-        // 验证cash减少
-        assert!(agent.cash() < initial_cash, "Cash should decrease after trade");
-        
-        // 验证current_price被更新
-        assert!(preference.current_price > 0.0, "Current price should be updated");
-        
-        // 验证current_range以新价格为中点，范围缩小10%
-        let (new_min, new_max) = preference.current_range;
-        let expected_length = (initial_range.1 - initial_range.0) * 0.9;
-        let actual_length = new_max - new_min;
-        assert!((actual_length - expected_length).abs() < expected_length * 0.1, "Range should be reduced by 10%"); // 允许10%的误差
-        
-        // 验证新范围以交易价格为中点
-        let midpoint = (new_min + new_max) / 2.0;
-        assert!((midpoint - preference.current_price).abs() < 0.001, "Range should be centered at trade price");
-        
-        // 验证范围不小于0
-        assert!(new_min >= 0.0, "Range minimum should be >= 0");
-        assert!(new_max > new_min, "Range maximum should be > minimum");
     }
     
     #[test]
@@ -415,12 +428,14 @@ mod tests {
             let result = agent.trade(&factory);
             
             // 检查是否交易成功且cash变为0
-            if result.is_some() && agent.cash() == 0.0 {
-                // 验证需求被移除
-                let demand = agent.demand.read().unwrap();
-                if !demand.contains_key(&product_id) {
-                    success = true;
-                    break;
+            if let TradeResult::Success(_price) = result {
+                if agent.cash() == 0.0 {
+                    // 验证需求被移除
+                    let demand = agent.demand.read().unwrap();
+                    if !demand.contains_key(&product_id) {
+                        success = true;
+                        break;
+                    }
                 }
             }
         }
@@ -480,7 +495,10 @@ mod tests {
         let result = agent.trade(&factory);
         
         // 验证交易失败
-        assert!(result.is_none(), "Trade should fail when cash is out of range");
+        match result {
+            TradeResult::Failed => {},
+            _ => panic!("Trade should fail when cash is out of range")
+        }
         
         // 验证cash没有变化
         assert_eq!(agent.cash(), initial_cash, "Cash should not change after failed trade");
