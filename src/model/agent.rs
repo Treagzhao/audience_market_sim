@@ -95,8 +95,8 @@ impl Agent {
         
         let mut g = self.preferences.write().unwrap();
         if let Some(preference) = g.get_mut(&product_id) {
-            // 计算概率：1 - 弹性值
-            let delete_probability = 1.0 - preference.original_elastic;
+            // 计算概率：弹性值本身，弹性越大，越容易删除需求
+            let delete_probability = preference.original_elastic;
             
             // 生成随机数（0.0到1.0）
             let random_value = rng.gen_range(0.0..1.0);
