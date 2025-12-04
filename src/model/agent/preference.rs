@@ -2,10 +2,10 @@ use rand::Rng;
 use crate::model::product::Product;
 
 pub struct Preference {
-    original_price: f64,
-    original_elastic: f64,
-    current_price: f64,
-    current_range: (f64, f64),
+    pub original_price: f64,
+    pub original_elastic: f64,
+    pub(crate) current_price: f64,
+    pub(crate) current_range: (f64, f64),
 }
 
 impl Preference {
