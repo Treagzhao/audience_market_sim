@@ -1,0 +1,4 @@
+/target
+.idea/
+*.lock
+1.txt
