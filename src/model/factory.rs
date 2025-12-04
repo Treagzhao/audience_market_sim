@@ -1,5 +1,6 @@
 use std::collections::{HashMap, LinkedList};
 use rand::Rng;
+use crate::model::agent::TradeResult;
 use crate::model::product::Product;
 
 pub struct Factory{
@@ -72,6 +73,42 @@ impl Factory {
             let v = self.u64_list.pop_front();
             if let Some(v) = v {
                 self.amount.remove(&v);
+            }
+        }
+    }
+
+    pub fn deal(&mut self, result: TradeResult) {
+        match result {
+            TradeResult::NotMatched => {
+                // 未匹配，不做任何处理
+                return;
+            },
+            TradeResult::Failed => {
+                // 交易失败，区间整体下移5%
+                let (lower, upper) = self.supply_price_range;
+                let range_length = upper - lower;
+                let shift_amount = range_length * 0.05; // 5%
+                
+                // 计算新的区间，确保下界不小于0
+                let new_lower = (lower - shift_amount).max(0.0);
+                let new_upper = upper - shift_amount;
+                
+                // 确保新的上界大于新的下界
+                let new_upper = new_upper.max(new_lower + 0.01); // 避免上下界相等
+                
+                self.supply_price_range = (new_lower, new_upper);
+            },
+            TradeResult::Success(_price) => {
+                // 交易成功，区间整体上移5%
+                let (lower, upper) = self.supply_price_range;
+                let range_length = upper - lower;
+                let shift_amount = range_length * 0.05; // 5%
+                
+                // 计算新的区间
+                let new_lower = lower + shift_amount;
+                let new_upper = upper + shift_amount;
+                
+                self.supply_price_range = (new_lower, new_upper);
             }
         }
     }
@@ -178,5 +215,54 @@ mod tests {
         assert_eq!(iter.next(), Some(&4));
         assert_eq!(iter.next(), Some(&5));
         assert_eq!(iter.next(), None);
+    }
+    
+    #[test]
+    fn test_deal() {
+        // 创建一个Product实例用于初始化Factory
+        let product = Product::new(1, "test_product".to_string());
+        let mut factory = Factory::new(1, "test_factory".to_string(), &product);
+        
+        // 手动设置一个固定的supply_price_range，便于测试
+        factory.supply_price_range = (100.0, 200.0);
+        let initial_range = factory.supply_price_range;
+        let range_length = initial_range.1 - initial_range.0;
+        let shift_amount = range_length * 0.05; // 5%
+        
+        // 测试交易成功情况 - 区间上移5%
+        factory.deal(TradeResult::Success(150.0));
+        let after_success = factory.supply_price_range;
+        assert!((after_success.0 - (initial_range.0 + shift_amount)).abs() < 0.001);
+        assert!((after_success.1 - (initial_range.1 + shift_amount)).abs() < 0.001);
+        
+        // 测试交易失败情况 - 区间下移5%
+        let success_range = factory.supply_price_range;
+        factory.deal(TradeResult::Failed);
+        let after_failure = factory.supply_price_range;
+        let failure_shift = (success_range.1 - success_range.0) * 0.05;
+        assert!((after_failure.0 - (success_range.0 - failure_shift)).abs() < 0.001);
+        assert!((after_failure.1 - (success_range.1 - failure_shift)).abs() < 0.001);
+        
+        // 测试未匹配情况 - 区间不变
+        let failure_range = factory.supply_price_range;
+        factory.deal(TradeResult::NotMatched);
+        let after_not_matched = factory.supply_price_range;
+        assert_eq!(after_not_matched, failure_range);
+    }
+    
+    #[test]
+    fn test_deal_with_small_range() {
+        // 测试边界情况：小范围区间
+        let product = Product::new(1, "test_product".to_string());
+        let mut factory = Factory::new(1, "test_factory".to_string(), &product);
+        
+        // 设置一个很小的范围
+        factory.supply_price_range = (0.0, 1.0);
+        
+        // 测试交易失败，确保下界不会小于0
+        factory.deal(TradeResult::Failed);
+        let after_failure = factory.supply_price_range;
+        assert!(after_failure.0 >= 0.0);
+        assert!(after_failure.1 > after_failure.0);
     }
 }
