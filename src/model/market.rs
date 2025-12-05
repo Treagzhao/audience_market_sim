@@ -48,7 +48,7 @@ impl Market {
             let agent = Agent::new(
                 agent_id,
                 format!("Consumer_{}", agent_id),
-                10.0,
+                100.0,
                 &products,
             );
             agents_vec.push(Arc::new(RwLock::new(agent)));
@@ -119,7 +119,7 @@ impl Market {
             let agents = self.agents.read().unwrap();
             let all_agents_broke = agents.iter().all(|agent| {
                 let a = agent.read().unwrap();
-                a.cash() <= 0.0
+                a.cash() < 0.01
             });
 
             // 检查退出条件
