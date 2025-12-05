@@ -90,7 +90,7 @@ impl Factory {
         }
         
         match result {
-            TradeResult::NotMatched => {
+            TradeResult::NotMatched | TradeResult::NotYet => {
                 // 未匹配，不做任何处理
                 return;
             },
@@ -249,14 +249,14 @@ mod tests {
         factory.start_round(test_round);
         
         // 测试交易成功情况 - 区间上移5%
-        factory.deal(TradeResult::Success(150.0), test_round);
+        factory.deal(&TradeResult::Success(150.0), test_round);
         let after_success = factory.supply_price_range;
         assert!((after_success.0 - (initial_range.0 + shift_amount)).abs() < 0.001);
         assert!((after_success.1 - (initial_range.1 + shift_amount)).abs() < 0.001);
         
         // 测试交易失败情况 - 区间下移5%
         let success_range = factory.supply_price_range;
-        factory.deal(TradeResult::Failed, test_round);
+        factory.deal(&TradeResult::Failed, test_round);
         let after_failure = factory.supply_price_range;
         let failure_shift = (success_range.1 - success_range.0) * 0.05;
         assert!((after_failure.0 - (success_range.0 - failure_shift)).abs() < 0.001);
@@ -264,7 +264,7 @@ mod tests {
         
         // 测试未匹配情况 - 区间不变
         let failure_range = factory.supply_price_range;
-        factory.deal(TradeResult::NotMatched, test_round);
+        factory.deal(&TradeResult::NotMatched, test_round);
         let after_not_matched = factory.supply_price_range;
         assert_eq!(after_not_matched, failure_range);
     }
@@ -283,7 +283,7 @@ mod tests {
         factory.start_round(test_round);
         
         // 测试交易失败，确保下界不会小于0
-        factory.deal(TradeResult::Failed, test_round);
+        factory.deal(&TradeResult::Failed, test_round);
         let after_failure = factory.supply_price_range;
         assert!(after_failure.0 >= 0.0);
         assert!(after_failure.1 > after_failure.0);
@@ -304,12 +304,12 @@ mod tests {
         assert_eq!(factory.amount.get(&current_round), Some(&10));
         
         // 测试交易成功，库存减1
-        factory.deal(TradeResult::Success(150.0), current_round);
+        factory.deal(&TradeResult::Success(150.0), current_round);
         assert_eq!(factory.amount.get(&current_round), Some(&9));
         
         // 测试多次交易成功，库存持续减少
-        factory.deal(TradeResult::Success(150.0), current_round);
-        factory.deal(TradeResult::Success(150.0), current_round);
+        factory.deal(&TradeResult::Success(150.0), current_round);
+        factory.deal(&TradeResult::Success(150.0), current_round);
         assert_eq!(factory.amount.get(&current_round), Some(&7));
     }
     
@@ -331,7 +331,7 @@ mod tests {
         assert_eq!(factory.amount.get(&current_round), Some(&0));
         
         // 测试交易成功，由于库存为0，deal方法应该不执行
-        factory.deal(TradeResult::Success(150.0), current_round);
+        factory.deal(&TradeResult::Success(150.0), current_round);
         
         // 验证库存仍为0
         assert_eq!(factory.amount.get(&current_round), Some(&0));

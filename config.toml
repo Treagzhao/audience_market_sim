@@ -5,115 +5,115 @@ mean_price = 15.0
 std_dev_price = 5.0
 mean_elastic = 0.05
 std_dev_elastic = 0.02
-
-[[products]]
-id = 2
-name = "Filtered Water"
-mean_price = 10.0
-std_dev_price = 2.0
-mean_elastic = 0.05
-std_dev_elastic = 0.01
-
-[[products]]
-id = 3
-name = "Basic Nutrients"
-mean_price = 30.0
-std_dev_price = 5.0
-mean_elastic = 0.08
-std_dev_elastic = 0.03
-
-[[products]]
-id = 4
-name = "Generic Meds"
-mean_price = 50.0
-std_dev_price = 10.0
-mean_elastic = 0.10
-std_dev_elastic = 0.05
-
-[[products]]
-id = 5
-name = "Low-end Clothing"
-mean_price = 80.0
-std_dev_price = 20.0
-mean_elastic = 0.15
-std_dev_elastic = 0.05
-
-[[products]]
-id = 6
-name = "Public Transport Pass"
-mean_price = 150.0
-std_dev_price = 30.0
-mean_elastic = 0.20
-std_dev_elastic = 0.10
-
-[[products]]
-id = 7
-name = "Standard Dataplan"
-mean_price = 200.0
-std_dev_price = 40.0
-mean_elastic = 0.30
-std_dev_elastic = 0.10
-
-[[products]]
-id = 8
-name = "Processed Meat"
-mean_price = 300.0
-std_dev_price = 50.0
-mean_elastic = 0.35
-std_dev_elastic = 0.15
-
-[[products]]
-id = 9
-name = "Household Appliance"
-mean_price = 500.0
-std_dev_price = 100.0
-mean_elastic = 0.40
-std_dev_elastic = 0.20
-
-[[products]]
-id = 10
-name = "Personal Computer"
-mean_price = 1500.0
-std_dev_price = 300.0
-mean_elastic = 0.60
-std_dev_elastic = 0.15
-
-[[products]]
-id = 11
-name = "Private Vehicle Lease"
-mean_price = 2500.0
-std_dev_price = 500.0
-mean_elastic = 0.70
-std_dev_elastic = 0.10
-
-[[products]]
-id = 12
-name = "Organic Whole Food"
-mean_price = 1200.0
-std_dev_price = 200.0
-mean_elastic = 0.65
-std_dev_elastic = 0.20
-
-[[products]]
-id = 13
-name = "Real Estate Token"
-mean_price = 6000.0
-std_dev_price = 1000.0
-mean_elastic = 0.85
-std_dev_elastic = 0.10
-
-[[products]]
-id = 14
-name = "Neural Implant Upgrade"
-mean_price = 8000.0
-std_dev_price = 1500.0
-mean_elastic = 0.90
-std_dev_elastic = 0.05
-
-[[products]]
-id = 15
-name = "Orbital Trip Ticket"
-mean_price = 10000.0
-std_dev_price = 2000.0
-mean_elastic = 0.95
-std_dev_elastic = 0.02
+#
+#[[products]]
+#id = 2
+#name = "Filtered Water"
+#mean_price = 10.0
+#std_dev_price = 2.0
+#mean_elastic = 0.05
+#std_dev_elastic = 0.01
+#
+#[[products]]
+#id = 3
+#name = "Basic Nutrients"
+#mean_price = 30.0
+#std_dev_price = 5.0
+#mean_elastic = 0.08
+#std_dev_elastic = 0.03
+#
+#[[products]]
+#id = 4
+#name = "Generic Meds"
+#mean_price = 50.0
+#std_dev_price = 10.0
+#mean_elastic = 0.10
+#std_dev_elastic = 0.05
+#
+#[[products]]
+#id = 5
+#name = "Low-end Clothing"
+#mean_price = 80.0
+#std_dev_price = 20.0
+#mean_elastic = 0.15
+#std_dev_elastic = 0.05
+#
+#[[products]]
+#id = 6
+#name = "Public Transport Pass"
+#mean_price = 150.0
+#std_dev_price = 30.0
+#mean_elastic = 0.20
+#std_dev_elastic = 0.10
+#
+#[[products]]
+#id = 7
+#name = "Standard Dataplan"
+#mean_price = 200.0
+#std_dev_price = 40.0
+#mean_elastic = 0.30
+#std_dev_elastic = 0.10
+#
+#[[products]]
+#id = 8
+#name = "Processed Meat"
+#mean_price = 300.0
+#std_dev_price = 50.0
+#mean_elastic = 0.35
+#std_dev_elastic = 0.15
+#
+#[[products]]
+#id = 9
+#name = "Household Appliance"
+#mean_price = 500.0
+#std_dev_price = 100.0
+#mean_elastic = 0.40
+#std_dev_elastic = 0.20
+#
+#[[products]]
+#id = 10
+#name = "Personal Computer"
+#mean_price = 1500.0
+#std_dev_price = 300.0
+#mean_elastic = 0.60
+#std_dev_elastic = 0.15
+#
+#[[products]]
+#id = 11
+#name = "Private Vehicle Lease"
+#mean_price = 2500.0
+#std_dev_price = 500.0
+#mean_elastic = 0.70
+#std_dev_elastic = 0.10
+#
+#[[products]]
+#id = 12
+#name = "Organic Whole Food"
+#mean_price = 1200.0
+#std_dev_price = 200.0
+#mean_elastic = 0.65
+#std_dev_elastic = 0.20
+#
+#[[products]]
+#id = 13
+#name = "Real Estate Token"
+#mean_price = 6000.0
+#std_dev_price = 1000.0
+#mean_elastic = 0.85
+#std_dev_elastic = 0.10
+#
+#[[products]]
+#id = 14
+#name = "Neural Implant Upgrade"
+#mean_price = 8000.0
+#std_dev_price = 1500.0
+#mean_elastic = 0.90
+#std_dev_elastic = 0.05
+#
+#[[products]]
+#id = 15
+#name = "Orbital Trip Ticket"
+#mean_price = 10000.0
+#std_dev_price = 2000.0
+#mean_elastic = 0.95
+#std_dev_elastic = 0.02

@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, RwLock};
 use csv::Writer;
 use crate::model::agent::Agent;
 use crate::model::factory::Factory;
@@ -34,7 +34,7 @@ impl TradeLog {
     pub fn new(
         round: u64,
         trade_id: u64,
-        agent: &Agent,
+        a: Arc<RwLock<Agent>>,
         factory: &Factory,
         product: &Product,
         trade_result: &TradeResult,
@@ -43,10 +43,11 @@ impl TradeLog {
             TradeResult::NotMatched => ("NotMatched", None),
             TradeResult::Failed => ("Failed", None),
             TradeResult::Success(p) => ("Success", Some(*p)),
+            TradeResult::NotYet => ("NotYet", None),
         };
         
         let (lower, upper) = factory.supply_price_range();
-        
+        let agent = a.read().unwrap();
         // 获取agent对该产品的偏好
         let preferences = agent.preferences();
         let preference = preferences.get(&product.id());
@@ -134,7 +135,7 @@ impl Logger {
         })
     }
     
-    pub fn log_trade(&self, round: u64, agent: &Agent, factory: &Factory, product: &Product, trade_result: &TradeResult) -> Result<(), csv::Error> {
+    pub fn log_trade(&self, round: u64, agent: Arc<RwLock<Agent>>, factory: &Factory, product: &Product, trade_result: &TradeResult) -> Result<(), csv::Error> {
         let mut counter = self.trade_counter.lock().unwrap();
         *counter += 1;
         let trade_id = *counter;
@@ -183,7 +184,7 @@ pub fn init_logger(file_path: &str) -> Result<(), csv::Error> {
 }
 
 // 记录交易日志
-pub fn log_trade(round: u64, agent: &Agent, factory: &Factory, product: &Product, trade_result: &TradeResult) -> Result<(), csv::Error> {
+pub fn log_trade(round: u64, agent: Arc<RwLock<Agent>>, factory: &Factory, product: &Product, trade_result: &TradeResult) -> Result<(), csv::Error> {
     if let Some(logger) = &mut *LOGGER.lock().unwrap() {
         logger.log_trade(round, agent, factory, product, trade_result)
     } else {
