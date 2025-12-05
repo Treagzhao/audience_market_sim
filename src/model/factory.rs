@@ -77,7 +77,14 @@ impl Factory {
         }
     }
 
-    pub fn deal(&mut self, result: TradeResult) {
+    pub fn deal(&mut self, result: TradeResult, round: u64) {
+        // 检查指定轮次的库存，如果为0则退出
+        if let Some(amount) = self.amount.get(&round) {
+            if *amount <= 0 {
+                return; // 库存为0，退出
+            }
+        }
+        
         match result {
             TradeResult::NotMatched => {
                 // 未匹配，不做任何处理
@@ -109,6 +116,10 @@ impl Factory {
                 let new_upper = upper + shift_amount;
                 
                 self.supply_price_range = (new_lower, new_upper);
+                
+                // 库存减1
+                // 更新指定轮次的库存
+                self.amount.entry(round).and_modify(|e| *e -= 1);
             }
         }
     }
@@ -229,15 +240,19 @@ mod tests {
         let range_length = initial_range.1 - initial_range.0;
         let shift_amount = range_length * 0.05; // 5%
         
+        // 启动一轮，否则库存检查会失败
+        let test_round = 1;
+        factory.start_round(test_round);
+        
         // 测试交易成功情况 - 区间上移5%
-        factory.deal(TradeResult::Success(150.0));
+        factory.deal(TradeResult::Success(150.0), test_round);
         let after_success = factory.supply_price_range;
         assert!((after_success.0 - (initial_range.0 + shift_amount)).abs() < 0.001);
         assert!((after_success.1 - (initial_range.1 + shift_amount)).abs() < 0.001);
         
         // 测试交易失败情况 - 区间下移5%
         let success_range = factory.supply_price_range;
-        factory.deal(TradeResult::Failed);
+        factory.deal(TradeResult::Failed, test_round);
         let after_failure = factory.supply_price_range;
         let failure_shift = (success_range.1 - success_range.0) * 0.05;
         assert!((after_failure.0 - (success_range.0 - failure_shift)).abs() < 0.001);
@@ -245,7 +260,7 @@ mod tests {
         
         // 测试未匹配情况 - 区间不变
         let failure_range = factory.supply_price_range;
-        factory.deal(TradeResult::NotMatched);
+        factory.deal(TradeResult::NotMatched, test_round);
         let after_not_matched = factory.supply_price_range;
         assert_eq!(after_not_matched, failure_range);
     }
@@ -259,10 +274,65 @@ mod tests {
         // 设置一个很小的范围
         factory.supply_price_range = (0.0, 1.0);
         
+        // 启动一轮，否则库存检查会失败
+        let test_round = 1;
+        factory.start_round(test_round);
+        
         // 测试交易失败，确保下界不会小于0
-        factory.deal(TradeResult::Failed);
+        factory.deal(TradeResult::Failed, test_round);
         let after_failure = factory.supply_price_range;
         assert!(after_failure.0 >= 0.0);
         assert!(after_failure.1 > after_failure.0);
+    }
+    
+    #[test]
+    fn test_deal_with_inventory() {
+        // 测试deal方法的库存逻辑
+        let product = Product::new(1, "test_product".to_string());
+        let mut factory = Factory::new(1, "test_factory".to_string(), &product);
+        
+        // 设置初始供应价格范围
+        factory.supply_price_range = (100.0, 200.0);
+        
+        // 启动一轮，初始库存为10
+        let current_round = 1;
+        factory.start_round(current_round);
+        assert_eq!(factory.amount.get(&current_round), Some(&10));
+        
+        // 测试交易成功，库存减1
+        factory.deal(TradeResult::Success(150.0), current_round);
+        assert_eq!(factory.amount.get(&current_round), Some(&9));
+        
+        // 测试多次交易成功，库存持续减少
+        factory.deal(TradeResult::Success(150.0), current_round);
+        factory.deal(TradeResult::Success(150.0), current_round);
+        assert_eq!(factory.amount.get(&current_round), Some(&7));
+    }
+    
+    #[test]
+    fn test_deal_with_zero_inventory() {
+        // 测试库存为0时deal方法不执行
+        let product = Product::new(1, "test_product".to_string());
+        let mut factory = Factory::new(1, "test_factory".to_string(), &product);
+        
+        // 设置初始供应价格范围
+        let initial_range = (100.0, 200.0);
+        factory.supply_price_range = initial_range;
+        
+        // 启动一轮，然后手动将库存设置为0
+        let current_round = 1;
+        factory.start_round(current_round);
+        // 手动设置库存为0
+        *factory.amount.get_mut(&current_round).unwrap() = 0;
+        assert_eq!(factory.amount.get(&current_round), Some(&0));
+        
+        // 测试交易成功，由于库存为0，deal方法应该不执行
+        factory.deal(TradeResult::Success(150.0), current_round);
+        
+        // 验证库存仍为0
+        assert_eq!(factory.amount.get(&current_round), Some(&0));
+        
+        // 验证价格区间没有变化
+        assert_eq!(factory.supply_price_range, initial_range);
     }
 }
