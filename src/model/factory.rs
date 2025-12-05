@@ -1,6 +1,7 @@
 use crate::logging::log_factory_range_optimization;
 use crate::model::agent::TradeResult;
 use crate::model::product::Product;
+use log::debug;
 use rand::Rng;
 use std::collections::{HashMap, LinkedList};
 

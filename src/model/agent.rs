@@ -3,6 +3,7 @@ use crate::model::agent::preference::Preference;
 use crate::model::factory::Factory;
 use crate::model::product::Product;
 use crate::model::util::interval_intersection;
+use log::debug;
 use rand::Rng;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
