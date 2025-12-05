@@ -2,6 +2,7 @@ use crate::logging::log_agent_range_adjustment;
 use crate::model::agent::preference::Preference;
 use crate::model::factory::Factory;
 use crate::model::product::Product;
+use log::debug;
 use crate::model::util::{
     gen_new_range_with_price, gen_price_in_range, interval_intersection, round_to_nearest_cent,
 };

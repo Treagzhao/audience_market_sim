@@ -150,11 +150,13 @@ impl Market {
             }
 
             // 检查是否所有agent的余额为0
-            let agents = self.agents.read().unwrap();
-            let all_agents_broke = agents.iter().all(|agent| {
-                let a = agent.read().unwrap();
-                a.cash() < 0.01
-            });
+            let all_agents_broke = {
+                let agents = self.agents.read().unwrap();
+                agents.iter().all(|agent| {
+                    let a = agent.read().unwrap();
+                    a.cash() < 0.01
+                })
+            };
 
             // 检查退出条件
             if round > MAX_ROUND || all_agents_broke || self.consecutive_zero_trades >= 20 {
