@@ -1,5 +1,6 @@
 use crate::entity::normal_distribute::NormalDistribution;
 
+#[derive(Clone)]
 pub struct Product {
     id: u64,
     name: String,

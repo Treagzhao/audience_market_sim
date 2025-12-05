@@ -59,6 +59,10 @@ impl Factory {
     pub fn supply_price_range(&self) -> (f64, f64) {
         self.supply_price_range
     }
+    
+    pub fn get_stock(&self, round: u64) -> i16 {
+        *self.amount.get(&round).unwrap_or(&10) // 默认库存为10
+    }
 
     /// 开始新一轮
     pub fn start_round(&mut self, round: u64) {
@@ -77,7 +81,7 @@ impl Factory {
         }
     }
 
-    pub fn deal(&mut self, result: TradeResult, round: u64) {
+    pub fn deal(&mut self, result: &TradeResult, round: u64) {
         // 检查指定轮次的库存，如果为0则退出
         if let Some(amount) = self.amount.get(&round) {
             if *amount <= 0 {
