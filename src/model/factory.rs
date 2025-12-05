@@ -98,7 +98,7 @@ impl Factory {
                 // 交易失败，区间整体下移1%
                 let (lower, upper) = self.supply_price_range;
                 let range_length = upper - lower;
-                let shift_amount = range_length * 0.01; // 1%
+                let shift_amount = range_length * 0.001; // 千分之一
 
                 // 确保最小调整单位为0.01
                 let shift_amount = shift_amount.max(0.01);
@@ -115,13 +115,46 @@ impl Factory {
                 // 确保新的上界大于新的下界，差值至少为0.01
                 let new_upper = new_upper.max(new_lower + 0.01);
 
+                // 计算修改幅度
+                let lower_change = new_lower - lower;
+                let upper_change = new_upper - upper;
+                let total_change = (new_lower + new_upper) - (lower + upper);
+
+                // 计算变化比例（基于原范围长度）
+                let lower_change_ratio = if range_length > 0.0 {
+                    lower_change / range_length
+                } else {
+                    0.0
+                };
+                let upper_change_ratio = if range_length > 0.0 {
+                    upper_change / range_length
+                } else {
+                    0.0
+                };
+
+                // 打印修改日志
+                println!(
+                    "Factory {} ({}) range adjusted: [{}, {}] -> [{}, {}] | Change: lower={:.4} ({:.2}%), upper={:.4} ({:.2}%), total={:.4}",
+                    self.id(),
+                    self.name(),
+                    lower,
+                    upper,
+                    new_lower,
+                    new_upper,
+                    lower_change,
+                    lower_change_ratio * 100.0,
+                    upper_change,
+                    upper_change_ratio * 100.0,
+                    total_change
+                );
+
                 self.supply_price_range = (new_lower, new_upper);
             }
             TradeResult::Success(_price) => {
                 // 交易成功，区间整体上移1%
                 let (lower, upper) = self.supply_price_range;
                 let range_length = upper - lower;
-                let shift_amount = range_length * 0.01; // 1%
+                let shift_amount = range_length * 0.001; // 千分之一
 
                 // 确保最小调整单位为0.01
                 let shift_amount = shift_amount.max(0.01);
@@ -137,6 +170,39 @@ impl Factory {
 
                 // 确保新的上界大于新的下界，差值至少为0.01
                 let new_upper = new_upper.max(new_lower + 0.01);
+
+                // 计算修改幅度
+                let lower_change = new_lower - lower;
+                let upper_change = new_upper - upper;
+                let total_change = (new_lower + new_upper) - (lower + upper);
+
+                // 计算变化比例（基于原范围长度）
+                let lower_change_ratio = if range_length > 0.0 {
+                    lower_change / range_length
+                } else {
+                    0.0
+                };
+                let upper_change_ratio = if range_length > 0.0 {
+                    upper_change / range_length
+                } else {
+                    0.0
+                };
+
+                // 打印修改日志
+                println!(
+                    "Factory {} ({}) range adjusted: [{}, {}] -> [{}, {}] | Change: lower={:.4} ({:.2}%), upper={:.4} ({:.2}%), total={:.4}",
+                    self.id(),
+                    self.name(),
+                    lower,
+                    upper,
+                    new_lower,
+                    new_upper,
+                    lower_change,
+                    lower_change_ratio * 100.0,
+                    upper_change,
+                    upper_change_ratio * 100.0,
+                    total_change
+                );
 
                 self.supply_price_range = (new_lower, new_upper);
 
@@ -261,13 +327,13 @@ mod tests {
         factory.supply_price_range = (100.0, 200.0);
         let initial_range = factory.supply_price_range;
         let range_length = initial_range.1 - initial_range.0;
-        let shift_amount = range_length * 0.01; // 1%
+        let shift_amount = range_length * 0.001; // 千分之一
 
         // 启动一轮，否则库存检查会失败
         let test_round = 1;
         factory.start_round(test_round);
 
-        // 测试交易成功情况 - 区间上移1%
+        // 测试交易成功情况 - 区间上移千分之一
         factory.deal(&TradeResult::Success(150.0), test_round);
         let after_success = factory.supply_price_range;
 
@@ -282,19 +348,19 @@ mod tests {
             "Upper bound should increase after success"
         );
         assert!(
-            (after_success.0 - (initial_range.0 + shift_amount)).abs() < 0.1,
+            (after_success.0 - (initial_range.0 + shift_amount)).abs() < 0.02,
             "Lower bound increase should be within expected range"
         );
         assert!(
-            (after_success.1 - (initial_range.1 + shift_amount)).abs() < 0.1,
+            (after_success.1 - (initial_range.1 + shift_amount)).abs() < 0.02,
             "Upper bound increase should be within expected range"
         );
 
-        // 测试交易失败情况 - 区间下移1%
+        // 测试交易失败情况 - 区间下移千分之一
         let success_range = factory.supply_price_range;
         factory.deal(&TradeResult::Failed, test_round);
         let after_failure = factory.supply_price_range;
-        let failure_shift = (success_range.1 - success_range.0) * 0.01;
+        let failure_shift = (success_range.1 - success_range.0) * 0.001; // 千分之一
 
         // 验证区间确实发生了变化，且方向正确
         assert!(
@@ -306,11 +372,11 @@ mod tests {
             "Upper bound should decrease after failure"
         );
         assert!(
-            (after_failure.0 - (success_range.0 - failure_shift)).abs() < 0.1,
+            (after_failure.0 - (success_range.0 - failure_shift)).abs() < 0.02,
             "Lower bound decrease should be within expected range"
         );
         assert!(
-            (after_failure.1 - (success_range.1 - failure_shift)).abs() < 0.1,
+            (after_failure.1 - (success_range.1 - failure_shift)).abs() < 0.02,
             "Upper bound decrease should be within expected range"
         );
 

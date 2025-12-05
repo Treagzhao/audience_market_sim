@@ -165,6 +165,38 @@ impl Agent {
                 let max_change = (new_max - old_max).abs();
 
                 if min_change >= 0.01 || max_change >= 0.01 {
+                    // 计算变化比例（基于原范围长度）
+                    let old_length = old_max - old_min;
+                    let min_change_value = new_min - old_min;
+                    let max_change_value = new_max - old_max;
+                    let min_change_ratio = if old_length > 0.0 {
+                        min_change_value / old_length
+                    } else {
+                        0.0
+                    };
+                    let max_change_ratio = if old_length > 0.0 {
+                        max_change_value / old_length
+                    } else {
+                        0.0
+                    };
+
+                    // 打印修改日志
+                    println!(
+                        "Agent {} ({}) product {} range adjusted (trade failed): [{}, {}] -> [{}, {}] | Change: min={:.4} ({:.2}%), max={:.4} ({:.2}%), center={:.2}",
+                        self.id,
+                        self.name,
+                        product_id,
+                        old_min,
+                        old_max,
+                        new_min,
+                        new_max,
+                        min_change_value,
+                        min_change_ratio * 100.0,
+                        max_change_value,
+                        max_change_ratio * 100.0,
+                        center
+                    );
+
                     preference.current_range = (new_min, new_max);
                 }
             }
@@ -242,6 +274,38 @@ impl Agent {
             let max_change = (new_max - old_max).abs();
 
             if min_change >= 0.01 || max_change >= 0.01 {
+                // 计算变化比例（基于原范围长度）
+                let old_length = old_max - old_min;
+                let min_change_value = new_min - old_min;
+                let max_change_value = new_max - old_max;
+                let min_change_ratio = if old_length > 0.0 {
+                    min_change_value / old_length
+                } else {
+                    0.0
+                };
+                let max_change_ratio = if old_length > 0.0 {
+                    max_change_value / old_length
+                } else {
+                    0.0
+                };
+
+                // 打印修改日志
+                println!(
+                    "Agent {} ({}) product {} range adjusted: [{}, {}] -> [{}, {}] | Change: min={:.4} ({:.2}%), max={:.4} ({:.2}%), price={:.2}",
+                    self.id(),
+                    self.name(),
+                    product_id,
+                    old_min,
+                    old_max,
+                    new_min,
+                    new_max,
+                    min_change_value,
+                    min_change_ratio * 100.0,
+                    max_change_value,
+                    max_change_ratio * 100.0,
+                    rounded_price
+                );
+
                 preference.current_range = (new_min, new_max);
             }
             return TradeResult::Success(rounded_price);
