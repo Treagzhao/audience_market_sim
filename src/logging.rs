@@ -1,10 +1,10 @@
-use std::fs::File;
-use std::sync::{Arc, Mutex, RwLock};
-use csv::Writer;
 use crate::model::agent::Agent;
+use crate::model::agent::TradeResult;
 use crate::model::factory::Factory;
 use crate::model::product::Product;
-use crate::model::agent::TradeResult;
+use csv::Writer;
+use std::fs::File;
+use std::sync::{Arc, Mutex, RwLock};
 
 // 交易日志结构体
 pub struct TradeLog {
@@ -45,15 +45,21 @@ impl TradeLog {
             TradeResult::Success(p) => ("Success", Some(*p)),
             TradeResult::NotYet => ("NotYet", None),
         };
-        
+
         let (lower, upper) = factory.supply_price_range();
         let agent = a.read().unwrap();
         // 获取agent对该产品的偏好
         let preferences = agent.preferences();
         let preference = preferences.get(&product.id());
-        
+
         // 提取偏好信息
-        let (agent_pref_original_price, agent_pref_original_elastic, agent_pref_current_price, agent_pref_current_range_lower, agent_pref_current_range_upper) = match preference {
+        let (
+            agent_pref_original_price,
+            agent_pref_original_elastic,
+            agent_pref_current_price,
+            agent_pref_current_range_lower,
+            agent_pref_current_range_upper,
+        ) = match preference {
             Some(pref) => (
                 Some(pref.original_price),
                 Some(pref.original_elastic),
@@ -61,15 +67,9 @@ impl TradeLog {
                 Some(pref.current_range.0),
                 Some(pref.current_range.1),
             ),
-            None => (
-                None,
-                None,
-                None,
-                None,
-                None,
-            ),
+            None => (None, None, None, None, None),
         };
-        
+
         TradeLog {
             round,
             trade_id,
@@ -105,7 +105,7 @@ impl Logger {
         // 使用create会自动截断文件，清空原有内容
         let file = File::create(file_path)?;
         let mut csv_writer = Writer::from_writer(file);
-        
+
         // 写入CSV头
         csv_writer.write_record([
             "round",
@@ -128,20 +128,27 @@ impl Logger {
             "agent_pref_current_range_lower",
             "agent_pref_current_range_upper",
         ])?;
-        
+
         Ok(Logger {
             csv_writer: Mutex::new(csv_writer),
             trade_counter: Mutex::new(0),
         })
     }
-    
-    pub fn log_trade(&self, round: u64, agent: Arc<RwLock<Agent>>, factory: &Factory, product: &Product, trade_result: &TradeResult) -> Result<(), csv::Error> {
+
+    pub fn log_trade(
+        &self,
+        round: u64,
+        agent: Arc<RwLock<Agent>>,
+        factory: &Factory,
+        product: &Product,
+        trade_result: &TradeResult,
+    ) -> Result<(), csv::Error> {
         let mut counter = self.trade_counter.lock().unwrap();
         *counter += 1;
         let trade_id = *counter;
-        
+
         let log = TradeLog::new(round, trade_id, agent, factory, product, trade_result);
-        
+
         let mut writer = self.csv_writer.lock().unwrap();
         writer.write_record([
             log.round.to_string(),
@@ -154,19 +161,31 @@ impl Logger {
             log.product_id.to_string(),
             log.product_name,
             log.trade_result,
-            log.price.map(|p| p.to_string()).unwrap_or("N/A".to_string()),
+            log.price
+                .map(|p| p.to_string())
+                .unwrap_or("-1.0".to_string()),
             log.factory_supply_range_lower.to_string(),
             log.factory_supply_range_upper.to_string(),
             log.factory_stock.to_string(),
-            log.agent_pref_original_price.map(|p| p.to_string()).unwrap_or("N/A".to_string()),
-            log.agent_pref_original_elastic.map(|e| e.to_string()).unwrap_or("N/A".to_string()),
-            log.agent_pref_current_price.map(|p| p.to_string()).unwrap_or("N/A".to_string()),
-            log.agent_pref_current_range_lower.map(|r| r.to_string()).unwrap_or("N/A".to_string()),
-            log.agent_pref_current_range_upper.map(|r| r.to_string()).unwrap_or("N/A".to_string()),
+            log.agent_pref_original_price
+                .map(|p| p.to_string())
+                .unwrap_or("-1.0".to_string()),
+            log.agent_pref_original_elastic
+                .map(|e| e.to_string())
+                .unwrap_or("-1.0".to_string()),
+            log.agent_pref_current_price
+                .map(|p| p.to_string())
+                .unwrap_or("-1.0".to_string()),
+            log.agent_pref_current_range_lower
+                .map(|r| r.to_string())
+                .unwrap_or("-1.0".to_string()),
+            log.agent_pref_current_range_upper
+                .map(|r| r.to_string())
+                .unwrap_or("-1.0".to_string()),
         ])?;
-        
+
         writer.flush()?;
-        
+
         Ok(())
     }
 }
@@ -184,10 +203,19 @@ pub fn init_logger(file_path: &str) -> Result<(), csv::Error> {
 }
 
 // 记录交易日志
-pub fn log_trade(round: u64, agent: Arc<RwLock<Agent>>, factory: &Factory, product: &Product, trade_result: &TradeResult) -> Result<(), csv::Error> {
+pub fn log_trade(
+    round: u64,
+    agent: Arc<RwLock<Agent>>,
+    factory: &Factory,
+    product: &Product,
+    trade_result: &TradeResult,
+) -> Result<(), csv::Error> {
     if let Some(logger) = &mut *LOGGER.lock().unwrap() {
         logger.log_trade(round, agent, factory, product, trade_result)
     } else {
-        Err(csv::Error::from(std::io::Error::new(std::io::ErrorKind::Other, "Logger not initialized")))
+        Err(csv::Error::from(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Logger not initialized",
+        )))
     }
 }
