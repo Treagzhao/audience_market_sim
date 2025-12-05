@@ -2,6 +2,7 @@ use crate::logging::log_agent_range_adjustment;
 use crate::model::agent::preference::Preference;
 use crate::model::factory::Factory;
 use crate::model::product::Product;
+use log::debug;
 use crate::model::util::{
     gen_new_range_with_price, gen_price_in_range, interval_intersection, round_to_nearest_cent,
 };
@@ -176,7 +177,7 @@ impl Agent {
                 // 删除demand
                 if let Ok(mut demand) = self.demand.write() {
                     demand.remove(&product_id);
-                    
+
                     // 记录需求删除日志
                     let preference = g.get(&product_id).unwrap();
                     if let Err(e) = crate::logging::log_agent_demand_removal(
@@ -280,7 +281,7 @@ impl Agent {
     fn remove_demand(&mut self, product_id: u64, round: u64, reason: &str) {
         let mut g = self.demand.write().unwrap();
         g.remove(&product_id);
-        
+
         // 记录需求删除日志
         let preferences = self.preferences.read().unwrap();
         if let Some(preference) = preferences.get(&product_id) {
