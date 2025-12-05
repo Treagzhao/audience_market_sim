@@ -1,3 +1,4 @@
+use crate::logging::log_agent_range_adjustment;
 use crate::model::agent::preference::Preference;
 use crate::model::factory::Factory;
 use crate::model::product::Product;
@@ -7,6 +8,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
+use tokio::io::AsyncWriteExt;
 
 mod preference;
 
@@ -19,6 +21,7 @@ pub struct Agent {
 }
 
 /// 交易结果枚举
+#[derive(Clone)]
 pub enum TradeResult {
     NotYet,
     /// 未匹配到合适的交易对手
@@ -180,22 +183,24 @@ impl Agent {
                         0.0
                     };
 
-                    // 打印修改日志
-                    println!(
-                        "Agent {} ({}) product {} range adjusted (trade failed): [{}, {}] -> [{}, {}] | Change: min={:.4} ({:.2}%), max={:.4} ({:.2}%), center={:.2}",
+                    // 调用日志记录函数
+                    if let Err(e) = log_agent_range_adjustment(
+                        0, // 注意：这里需要传入实际的round参数，目前代码中没有传递，暂时用0代替
                         self.id,
-                        self.name,
+                        self.name.clone(),
                         product_id,
-                        old_min,
-                        old_max,
-                        new_min,
-                        new_max,
+                        (old_min, old_max),
+                        (new_min, new_max),
                         min_change_value,
-                        min_change_ratio * 100.0,
                         max_change_value,
-                        max_change_ratio * 100.0,
-                        center
-                    );
+                        min_change_ratio,
+                        max_change_ratio,
+                        center,
+                        "trade_failed",
+                        None, // 交易失败，没有价格
+                    ) {
+                        eprintln!("Failed to log agent range adjustment: {}", e);
+                    }
 
                     preference.current_range = (new_min, new_max);
                 }
@@ -289,22 +294,24 @@ impl Agent {
                     0.0
                 };
 
-                // 打印修改日志
-                println!(
-                    "Agent {} ({}) product {} range adjusted: [{}, {}] -> [{}, {}] | Change: min={:.4} ({:.2}%), max={:.4} ({:.2}%), price={:.2}",
+                // 调用日志记录函数
+                if let Err(e) = log_agent_range_adjustment(
+                    0, // 注意：这里需要传入实际的round参数，目前代码中没有传递，暂时用0代替
                     self.id(),
-                    self.name(),
+                    self.name().to_string(),
                     product_id,
-                    old_min,
-                    old_max,
-                    new_min,
-                    new_max,
+                    (old_min, old_max),
+                    (new_min, new_max),
                     min_change_value,
-                    min_change_ratio * 100.0,
                     max_change_value,
-                    max_change_ratio * 100.0,
-                    rounded_price
-                );
+                    min_change_ratio,
+                    max_change_ratio,
+                    rounded_price, // 交易成功，以成交价格为中心
+                    "trade_success",
+                    Some(rounded_price), // 交易成功，有价格
+                ) {
+                    eprintln!("Failed to log agent range adjustment: {}", e);
+                }
 
                 preference.current_range = (new_min, new_max);
             }

@@ -1,7 +1,9 @@
 mod model;
 mod entity;
 mod logging;
+mod util;
 
+use rand::{distributions::Alphanumeric, Rng};
 use std::fs::File;
 use std::io::Read;
 use toml::Value;
@@ -48,8 +50,15 @@ fn init_products() -> Vec<crate::model::product::Product> {
 }
 
 fn main() {
-    // 初始化日志记录器
-    if let Err(e) = init_logger("trade_logs.csv") {
+    // 生成随机task_id
+    let task_id: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect();
+    
+    // 初始化日志记录器，传递task_id
+    if let Err(e) = init_logger("trade_logs.csv", task_id.clone()) {
         eprintln!("Failed to initialize logger: {}", e);
         return;
     }
@@ -65,6 +74,9 @@ fn main() {
     
     // 运行市场模拟
     println!("Starting market simulation...");
+    println!("Task ID: {}", task_id);
+    println!("Pausing for 5 seconds...");
+    std::thread::sleep(std::time::Duration::from_secs(5));
     market.run();
-    println!("Market simulation completed!");
+    println!("Market simulation {:?} completed!", task_id);
 }

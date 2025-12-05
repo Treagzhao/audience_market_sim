@@ -1,4 +1,4 @@
-use crate::logging::log_trade;
+use crate::logging::{log_agent_cash, log_trade};
 use crate::model::agent::{Agent, TradeResult};
 use crate::model::factory::Factory;
 use crate::model::product::Product;
@@ -45,12 +45,7 @@ impl Market {
         println!("before agent created");
         // 生成100个消费者，每个消费者初始有10万块钱
         for agent_id in 1..=100 {
-            let agent = Agent::new(
-                agent_id,
-                format!("Consumer_{}", agent_id),
-                100.0,
-                &products,
-            );
+            let agent = Agent::new(agent_id, format!("Consumer_{}", agent_id), 100.0, &products);
             agents_vec.push(Arc::new(RwLock::new(agent)));
         }
         println!("after agents created");
@@ -115,6 +110,30 @@ impl Market {
                 *r
             };
 
+            // 记录每个agent的现金情况
+            {
+                // 生成一个共享的timestamp，确保同一轮的所有log_cash事件使用同一个时间戳
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("Failed to get system time")
+                    .as_millis() as i64;
+
+                let agents = self.agents.read().unwrap();
+                for agent in agents.iter() {
+                    let a = agent.read().unwrap();
+                    if let Err(e) = log_agent_cash(
+                        timestamp,
+                        round,
+                        a.id(),
+                        a.name().to_string(),
+                        a.cash(),
+                        total_trades,
+                    ) {
+                        eprintln!("Failed to log agent cash: {}", e);
+                    }
+                }
+            }
+
             // 检查是否所有agent的余额为0
             let agents = self.agents.read().unwrap();
             let all_agents_broke = agents.iter().all(|agent| {
@@ -126,10 +145,10 @@ impl Market {
             if round > MAX_ROUND || all_agents_broke {
                 println!("Simulation ending...");
                 if round > MAX_ROUND {
-                    println!("Reason: Reached maximum rounds ({}).", MAX_ROUND);
+                    println!("Reason: Reached maximum rounds ({})\n", MAX_ROUND);
                 }
                 if all_agents_broke {
-                    println!("Reason: All agents have zero or negative cash.");
+                    println!("Reason: All agents have zero or negative cash.\n");
                 }
                 break;
             }

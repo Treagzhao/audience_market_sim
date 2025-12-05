@@ -1,8 +1,10 @@
+use crate::logging::log_factory_range_optimization;
 use crate::model::agent::TradeResult;
 use crate::model::product::Product;
 use rand::Rng;
 use std::collections::{HashMap, LinkedList};
 
+#[derive(Clone)]
 pub struct Factory {
     id: u64,
     name: String,
@@ -132,21 +134,23 @@ impl Factory {
                     0.0
                 };
 
-                // 打印修改日志
-                println!(
-                    "Factory {} ({}) range adjusted: [{}, {}] -> [{}, {}] | Change: lower={:.4} ({:.2}%), upper={:.4} ({:.2}%), total={:.4}",
+                // 调用日志记录函数
+                if let Err(e) = log_factory_range_optimization(
+                    round,
                     self.id(),
-                    self.name(),
-                    lower,
-                    upper,
-                    new_lower,
-                    new_upper,
+                    self.name().to_string(),
+                    self.product_id(),
+                    (lower, upper),
+                    (new_lower, new_upper),
                     lower_change,
-                    lower_change_ratio * 100.0,
                     upper_change,
-                    upper_change_ratio * 100.0,
-                    total_change
-                );
+                    total_change,
+                    lower_change_ratio,
+                    upper_change_ratio,
+                    "Failed"
+                ) {
+                    eprintln!("Failed to log factory range optimization: {}", e);
+                }
 
                 self.supply_price_range = (new_lower, new_upper);
             }
@@ -188,21 +192,23 @@ impl Factory {
                     0.0
                 };
 
-                // 打印修改日志
-                println!(
-                    "Factory {} ({}) range adjusted: [{}, {}] -> [{}, {}] | Change: lower={:.4} ({:.2}%), upper={:.4} ({:.2}%), total={:.4}",
+                // 调用日志记录函数
+                if let Err(e) = log_factory_range_optimization(
+                    round,
                     self.id(),
-                    self.name(),
-                    lower,
-                    upper,
-                    new_lower,
-                    new_upper,
+                    self.name().to_string(),
+                    self.product_id(),
+                    (lower, upper),
+                    (new_lower, new_upper),
                     lower_change,
-                    lower_change_ratio * 100.0,
                     upper_change,
-                    upper_change_ratio * 100.0,
-                    total_change
-                );
+                    total_change,
+                    lower_change_ratio,
+                    upper_change_ratio,
+                    "Success"
+                ) {
+                    eprintln!("Failed to log factory range optimization: {}", e);
+                }
 
                 self.supply_price_range = (new_lower, new_upper);
 
