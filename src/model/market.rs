@@ -45,7 +45,12 @@ impl Market {
         println!("before agent created");
         // 生成100个消费者，每个消费者初始有10万块钱
         for agent_id in 1..=100 {
-            let agent = Agent::new(agent_id, format!("Consumer_{}", agent_id), 100000.0, &products);
+            let agent = Agent::new(
+                agent_id,
+                format!("Consumer_{}", agent_id),
+                10.0,
+                &products,
+            );
             agents_vec.push(Arc::new(RwLock::new(agent)));
         }
         println!("after agents created");
@@ -60,7 +65,7 @@ impl Market {
         let mut rng = rand::thread_rng();
         let mut round = 1;
         let mut total_trades = 0;
-        const MAX_ROUND: u64 = 100;
+        const MAX_ROUND: u64 = 2000;
 
         loop {
             println!("Starting round {}, Total trades: {}", round, total_trades);
@@ -80,6 +85,7 @@ impl Market {
             // 获取产品ID列表
             let product_ids: Vec<u64> = self.products.iter().map(|p| p.id()).collect();
             let mut handles: Vec<JoinHandle<_>> = Vec::new();
+            let round_trades: Arc<RwLock<u64>> = Arc::new(RwLock::new(0));
             for i in 0..product_ids.len() {
                 let product_id = product_ids[i];
                 let products = self.products.clone();
@@ -89,20 +95,25 @@ impl Market {
                 }
                 let f_list = f.unwrap().clone();
                 let agents = self.agents.clone();
+                let mut counter = round_trades.clone();
                 let h = thread::spawn(move || {
-                    process_product_trades(products, f_list, agents, round, product_id);
+                    let count = process_product_trades(products, f_list, agents, round, product_id);
+                    let mut c = counter.write().unwrap();
+                    *c += count;
                 });
                 handles.push(h);
             }
 
             // 等待所有线程完成
             for h in handles {
-                h.join().unwrap();
+                h.join().expect("error ");
             }
 
             // 汇总本轮交易数
-            let round_trades: u64 = 0;
-            total_trades += round_trades;
+            total_trades += {
+                let r = round_trades.read().unwrap();
+                *r
+            };
 
             // 检查是否所有agent的余额为0
             let agents = self.agents.read().unwrap();

@@ -20,7 +20,7 @@ impl Preference {
     
     pub fn from_product(product: &Product) -> Self {
         // 使用产品的价格分布生成原始价格
-        let original_price = product.original_price_distribution().sample(None);
+        let original_price = product.original_price_distribution().sample(Some((0.0,1000000.0)));
         // 使用产品的弹性分布生成原始弹性，并限制在0~1之间
         let original_elastic = product.original_elastic_distribution().sample(Some((0.0, 1.0)));
         

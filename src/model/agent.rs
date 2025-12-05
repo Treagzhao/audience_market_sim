@@ -142,20 +142,31 @@ impl Agent {
                 let center = factory.supply_price_range().0;
 
                 // 当前range长度
-                let (min, max) = preference.current_range;
-                let old_length = max - min;
+                let (old_min, old_max) = preference.current_range;
+                let old_length = old_max - old_min;
                 let new_length = old_length * 1.1; // 范围增大10%
                 let half_new_length = new_length / 2.0;
 
-                // 计算新的range
-                let new_min = center - half_new_length;
-                let new_max = center + half_new_length;
+                // 计算四舍五入后的half_new_length，确保最小单位是0.01
+                let round_to_nearest_cent = |x: f64| (x * 100.0).round() / 100.0;
+                let rounded_half_length = round_to_nearest_cent(half_new_length);
 
-                // 确保最小值不小于0
-                let new_min = new_min.max(0.0);
+                // 计算新的range，以center为中心，确保不小于0
+                let new_min = round_to_nearest_cent(center - rounded_half_length).max(0.0);
+                let mut new_max = round_to_nearest_cent(center + rounded_half_length);
 
-                // 更新range
-                preference.current_range = (new_min, new_max);
+                // 确保max大于min
+                if new_max <= new_min {
+                    new_max = new_min + 0.01;
+                }
+
+                // 计算变化量，如果小于0.01，则不更新
+                let min_change = (new_min - old_min).abs();
+                let max_change = (new_max - old_max).abs();
+
+                if min_change >= 0.01 || max_change >= 0.01 {
+                    preference.current_range = (new_min, new_max);
+                }
             }
         }
     }
@@ -171,7 +182,11 @@ impl Agent {
         let product_id = factory.product_id();
         if let Some(range) = merge_range {
             // 根据range生成一个随机price值
-            let (min_price, max_price) = range;
+            let (mut min_price, mut max_price) = range;
+            // 确保范围有效，避免min_price等于max_price
+            if min_price >= max_price {
+                max_price = min_price + 0.01;
+            }
             let mut rng = rand::thread_rng();
             let mut price = rng.gen_range(min_price..max_price);
 
@@ -192,20 +207,36 @@ impl Agent {
             demand.remove(&product_id);
             self.cash -= price;
             let preference = g.get_mut(&product_id).unwrap();
-            preference.current_price = price;
+            // 四舍五入price到0.01后存储
+            let round_to_nearest_cent = |x: f64| (x * 100.0).round() / 100.0;
+            let rounded_price = round_to_nearest_cent(price);
+            preference.current_price = rounded_price;
 
             // 更新current_range，以新price为中点，范围比之前小10%
-            let (mut min, mut max) = preference.current_range;
-            let old_length = max - min;
+            let (old_min, old_max) = preference.current_range;
+            let old_length = old_max - old_min;
             let new_length = old_length * 0.9; // 范围缩小10%
             let half_new_length = new_length / 2.0;
 
-            // 计算新的范围，确保不小于0
-            min = price - half_new_length;
-            max = price + half_new_length;
-            min = min.max(0.0);
+            // 计算半长并四舍五入到0.01
+            let rounded_half_length = round_to_nearest_cent(half_new_length);
 
-            preference.current_range = (min, max);
+            // 从中点向两边扩展，确保以rounded_price为中心
+            let new_min = round_to_nearest_cent(rounded_price - rounded_half_length).max(0.0);
+            let mut new_max = round_to_nearest_cent(rounded_price + rounded_half_length);
+
+            // 确保max大于min
+            if new_max <= new_min {
+                new_max = new_min + 0.01;
+            }
+
+            // 计算变化量，如果小于0.01，则不更新
+            let min_change = (new_min - old_min).abs();
+            let max_change = (new_max - old_max).abs();
+
+            if min_change >= 0.01 || max_change >= 0.01 {
+                preference.current_range = (new_min, new_max);
+            }
             return TradeResult::Success(price);
         } else {
             // 没有交集，处理交易失败
@@ -451,7 +482,10 @@ mod tests {
                 let midpoint = (new_min + new_max) / 2.0;
                 assert!(
                     (midpoint - preference.current_price).abs() < 0.001,
-                    "Range should be centered at trade price"
+                    "Range should be centered at trade price (midpoint: {}, price: {})
+",
+                    midpoint,
+                    preference.current_price
                 );
 
                 // 验证范围不小于0
@@ -696,7 +730,13 @@ mod tests {
         let name = "test_agent".to_string();
         let cash = 100.0;
         let products = vec![product];
-        let agent = Agent::new(id, name, cash, &products);
+        let mut agent = Agent::new(id, name, cash, &products);
+
+        // 清除所有需求，确保没有需求
+        {
+            let mut demand = agent.demand.write().unwrap();
+            demand.clear();
+        }
 
         // 没有添加需求，验证has_demand返回false
         assert!(
