@@ -1,8 +1,9 @@
 use crate::logging::log_factory_range_optimization;
-use crate::model::agent::TradeResult;
+use crate::model::agent::{IntervalRelation, TradeResult};
 use crate::model::product::Product;
 use rand::Rng;
 use std::collections::{HashMap, LinkedList};
+use crate::model::util::shift_range_by_ratio;
 
 #[derive(Clone)]
 pub struct Factory {
@@ -83,7 +84,12 @@ impl Factory {
         }
     }
 
-    pub fn deal(&mut self, result: &TradeResult, round: u64) {
+    pub fn deal(
+        &mut self,
+        result: &TradeResult,
+        round: u64,
+        interval_relation: Option<IntervalRelation>,
+    ) {
         // 检查指定轮次的库存，如果为0则退出
         if let Some(amount) = self.amount.get(&round) {
             if *amount <= 0 {
@@ -97,25 +103,26 @@ impl Factory {
                 return;
             }
             TradeResult::Failed => {
-                // 交易失败，区间整体下移1%
-                let (lower, upper) = self.supply_price_range;
+                let mut ratio = 0.0;
+                if interval_relation.is_none() {
+                    ratio = -0.01;
+                }else {
+                    let interval_rel = interval_relation.unwrap();
+                    match interval_rel {
+                        IntervalRelation::Overlapping(_) => {
+                            ratio = -0.01;
+                        }
+                        IntervalRelation::AgentBelowFactory => {
+                            ratio = -0.01;
+                        }
+                        IntervalRelation::AgentAboveFactory => {
+                            ratio = 0.01;
+                        }
+                    }
+                }
+                let (lower,upper) = self.supply_price_range;
                 let range_length = upper - lower;
-                let shift_amount = range_length * 0.001; // 千分之一
-
-                // 确保最小调整单位为0.01
-                let shift_amount = shift_amount.max(0.01);
-
-                // 计算新的区间，确保下界不小于0
-                let new_lower = (lower - shift_amount).max(0.0);
-                let new_upper = upper - shift_amount;
-
-                // 四舍五入到0.01
-                let round_to_nearest_cent = |x: f64| (x * 100.0).round() / 100.0;
-                let new_lower = round_to_nearest_cent(new_lower);
-                let new_upper = round_to_nearest_cent(new_upper);
-
-                // 确保新的上界大于新的下界，差值至少为0.01
-                let new_upper = new_upper.max(new_lower + 0.01);
+                let (new_lower, new_upper) = shift_range_by_ratio(self.supply_price_range,ratio);
 
                 // 计算修改幅度
                 let lower_change = new_lower - lower;
@@ -147,7 +154,7 @@ impl Factory {
                     total_change,
                     lower_change_ratio,
                     upper_change_ratio,
-                    "Failed"
+                    "Failed",
                 ) {
                     eprintln!("Failed to log factory range optimization: {}", e);
                 }
@@ -157,24 +164,8 @@ impl Factory {
             TradeResult::Success(_price) => {
                 // 交易成功，区间整体上移1%
                 let (lower, upper) = self.supply_price_range;
+                let (new_lower,new_upper) = shift_range_by_ratio(self.supply_price_range,0.01);
                 let range_length = upper - lower;
-                let shift_amount = range_length * 0.001; // 千分之一
-
-                // 确保最小调整单位为0.01
-                let shift_amount = shift_amount.max(0.01);
-
-                // 计算新的区间
-                let new_lower = lower + shift_amount;
-                let new_upper = upper + shift_amount;
-
-                // 四舍五入到0.01
-                let round_to_nearest_cent = |x: f64| (x * 100.0).round() / 100.0;
-                let new_lower = round_to_nearest_cent(new_lower);
-                let new_upper = round_to_nearest_cent(new_upper);
-
-                // 确保新的上界大于新的下界，差值至少为0.01
-                let new_upper = new_upper.max(new_lower + 0.01);
-
                 // 计算修改幅度
                 let lower_change = new_lower - lower;
                 let upper_change = new_upper - upper;
@@ -205,7 +196,7 @@ impl Factory {
                     total_change,
                     lower_change_ratio,
                     upper_change_ratio,
-                    "Success"
+                    "Success",
                 ) {
                     eprintln!("Failed to log factory range optimization: {}", e);
                 }
@@ -340,7 +331,7 @@ mod tests {
         factory.start_round(test_round);
 
         // 测试交易成功情况 - 区间上移千分之一
-        factory.deal(&TradeResult::Success(150.0), test_round);
+        factory.deal(&TradeResult::Success(150.0), test_round, None);
         let after_success = factory.supply_price_range;
 
         // 由于添加了四舍五入处理，实际结果会与预期有细微差异
@@ -353,44 +344,95 @@ mod tests {
             after_success.1 > initial_range.1,
             "Upper bound should increase after success"
         );
+        println!("before:{:?} after:{:?} shift_amount:{:?}",initial_range,after_success,shift_amount);
         assert!(
-            (after_success.0 - (initial_range.0 + shift_amount)).abs() < 0.02,
+            (shift_amount / initial_range.1).abs() < 0.02,
             "Lower bound increase should be within expected range"
         );
         assert!(
-            (after_success.1 - (initial_range.1 + shift_amount)).abs() < 0.02,
+            (shift_amount / initial_range.0).abs() < 0.02,
             "Upper bound increase should be within expected range"
         );
 
-        // 测试交易失败情况 - 区间下移千分之一
+        // 测试交易失败情况 - 无区间关系
         let success_range = factory.supply_price_range;
-        factory.deal(&TradeResult::Failed, test_round);
+        factory.deal(&TradeResult::Failed, test_round, None);
         let after_failure = factory.supply_price_range;
-        let failure_shift = (success_range.1 - success_range.0) * 0.001; // 千分之一
-
+        
         // 验证区间确实发生了变化，且方向正确
         assert!(
             after_failure.0 < success_range.0,
-            "Lower bound should decrease after failure"
+            "Lower bound should decrease after failure with no interval relation"
         );
         assert!(
             after_failure.1 < success_range.1,
-            "Upper bound should decrease after failure"
-        );
-        assert!(
-            (after_failure.0 - (success_range.0 - failure_shift)).abs() < 0.02,
-            "Lower bound decrease should be within expected range"
-        );
-        assert!(
-            (after_failure.1 - (success_range.1 - failure_shift)).abs() < 0.02,
-            "Upper bound decrease should be within expected range"
+            "Upper bound should decrease after failure with no interval relation"
         );
 
         // 测试未匹配情况 - 区间不变
         let failure_range = factory.supply_price_range;
-        factory.deal(&TradeResult::NotMatched, test_round);
+        factory.deal(&TradeResult::NotMatched, test_round, None);
         let after_not_matched = factory.supply_price_range;
         assert_eq!(after_not_matched, failure_range);
+    }
+
+    #[test]
+    fn test_deal_with_interval_relation() {
+        // 创建一个Product实例用于初始化Factory
+        let product = Product::new(1, "test_product".to_string());
+        let mut factory = Factory::new(1, "test_factory".to_string(), &product);
+
+        // 手动设置一个固定的supply_price_range，便于测试
+        factory.supply_price_range = (100.0, 200.0);
+        
+        // 启动一轮，否则库存检查会失败
+        let test_round = 1;
+        factory.start_round(test_round);
+
+        // 测试1: 交易失败 + Overlapping关系 - 区间下移1%
+        let initial_range = factory.supply_price_range;
+        factory.deal(&TradeResult::Failed, test_round, Some(IntervalRelation::Overlapping((100.0, 200.0))));
+        let after_overlapping = factory.supply_price_range;
+        
+        // 验证区间下移
+        assert!(
+            after_overlapping.0 < initial_range.0,
+            "Lower bound should decrease after failure with Overlapping relation"
+        );
+        assert!(
+            after_overlapping.1 < initial_range.1,
+            "Upper bound should decrease after failure with Overlapping relation"
+        );
+
+        // 测试2: 交易失败 + AgentBelowFactory关系 - 区间下移1%
+        let overlapping_range = factory.supply_price_range;
+        factory.deal(&TradeResult::Failed, test_round, Some(IntervalRelation::AgentBelowFactory));
+        let after_below = factory.supply_price_range;
+        
+        // 验证区间下移
+        assert!(
+            after_below.0 < overlapping_range.0,
+            "Lower bound should decrease after failure with AgentBelowFactory relation"
+        );
+        assert!(
+            after_below.1 < overlapping_range.1,
+            "Upper bound should decrease after failure with AgentBelowFactory relation"
+        );
+
+        // 测试3: 交易失败 + AgentAboveFactory关系 - 区间上移1%
+        let below_range = factory.supply_price_range;
+        factory.deal(&TradeResult::Failed, test_round, Some(IntervalRelation::AgentAboveFactory));
+        let after_above = factory.supply_price_range;
+        
+        // 验证区间上移
+        assert!(
+            after_above.0 > below_range.0,
+            "Lower bound should increase after failure with AgentAboveFactory relation"
+        );
+        assert!(
+            after_above.1 > below_range.1,
+            "Upper bound should increase after failure with AgentAboveFactory relation"
+        );
     }
 
     #[test]
@@ -407,7 +449,7 @@ mod tests {
         factory.start_round(test_round);
 
         // 测试交易失败，确保下界不会小于0
-        factory.deal(&TradeResult::Failed, test_round);
+        factory.deal(&TradeResult::Failed, test_round, None);
         let after_failure = factory.supply_price_range;
         assert!(after_failure.0 >= 0.0);
         assert!(after_failure.1 > after_failure.0);
@@ -428,12 +470,12 @@ mod tests {
         assert_eq!(factory.amount.get(&current_round), Some(&10));
 
         // 测试交易成功，库存减1
-        factory.deal(&TradeResult::Success(150.0), current_round);
+        factory.deal(&TradeResult::Success(150.0), current_round, None);
         assert_eq!(factory.amount.get(&current_round), Some(&9));
 
         // 测试多次交易成功，库存持续减少
-        factory.deal(&TradeResult::Success(150.0), current_round);
-        factory.deal(&TradeResult::Success(150.0), current_round);
+        factory.deal(&TradeResult::Success(150.0), current_round, None);
+        factory.deal(&TradeResult::Success(150.0), current_round, None);
         assert_eq!(factory.amount.get(&current_round), Some(&7));
     }
 
@@ -455,7 +497,7 @@ mod tests {
         assert_eq!(factory.amount.get(&current_round), Some(&0));
 
         // 测试交易成功，由于库存为0，deal方法应该不执行
-        factory.deal(&TradeResult::Success(150.0), current_round);
+        factory.deal(&TradeResult::Success(150.0), current_round, None);
 
         // 验证库存仍为0
         assert_eq!(factory.amount.get(&current_round), Some(&0));

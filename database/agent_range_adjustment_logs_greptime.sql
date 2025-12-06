@@ -5,10 +5,10 @@ CREATE TABLE agent_range_adjustment_logs (
     
     -- 标签字段（用于分组、过滤的高频查询字段）
     round BIGINT,                    -- 模拟轮次
-    task_id STRING,                  -- 任务ID
-    agent_id BIGINT,                 -- 主体ID
+    task_id STRING INVERTED INDEX,                  -- 任务ID
+    agent_id BIGINT INVERTED INDEX,                 -- 主体ID
     agent_name STRING,               -- 主体名称
-    product_id BIGINT,               -- 产品ID
+    product_id BIGINT INVERTED INDEX,               -- 产品ID
     adjustment_type STRING,          -- 调整类型：trade_success 或 trade_failed
     
     -- 字段（数值型数据，用于聚合分析）

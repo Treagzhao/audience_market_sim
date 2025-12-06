@@ -6,14 +6,15 @@ CREATE TABLE trade_logs (
     -- 标签字段（用于分组、过滤的高频查询字段）
     round BIGINT,                    -- 模拟轮次
     trade_id BIGINT,                 -- 交易ID
-    task_id STRING,                  -- 任务ID
-    agent_id BIGINT,                 -- 主体ID
+    task_id STRING INVERTED INDEX,                  -- 任务ID
+    agent_id BIGINT INVERTED INDEX,                 -- 主体ID
     agent_name STRING,               -- 主体名称
-    factory_id BIGINT,               -- 工厂ID
+    factory_id BIGINT INVERTED INDEX,               -- 工厂ID
     factory_name STRING,             -- 工厂名称
-    product_id BIGINT,               -- 产品ID
+    product_id BIGINT INVERTED INDEX,               -- 产品ID
     product_name STRING,             -- 产品名称
     trade_result STRING,             -- 交易结果（Success/Failed/NotMatched/NotYet）
+    interval_relation STRING,        -- 区间关系（Overlapping/AgentBelowFactory/AgentAboveFactory）
     
     -- 字段（数值型数据，用于聚合分析）
     agent_cash DOUBLE NOT NULL,      -- 主体现金
@@ -56,6 +57,7 @@ CREATE TABLE trade_logs (
 --     101,           -- product_id
 --     'product_1',   -- product_name
 --     'Success',     -- trade_result
+--     'Overlapping', -- interval_relation
 --     150.5,         -- price
 --     100.0,         -- factory_supply_range_lower
 --     200.0,         -- factory_supply_range_upper

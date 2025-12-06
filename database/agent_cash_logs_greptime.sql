@@ -2,20 +2,20 @@
 CREATE TABLE agent_cash_logs (
     -- 时间索引字段
     `timestamp` TIMESTAMP NOT NULL,
-    
+
     -- 标签字段（用于分组、过滤的高频查询字段）
     round BIGINT,                    -- 模拟轮次
-    task_id STRING,                  -- 任务ID
-    agent_id BIGINT,                 -- 主体ID
+    task_id STRING INVERTED INDEX,                  -- 任务ID
+    agent_id BIGINT INVERTED INDEX,                 -- 主体ID
     agent_name STRING,               -- 主体名称
-    
+
     -- 字段（数值型数据，用于聚合分析）
     cash DOUBLE NOT NULL,            -- 主体现金
     total_trades BIGINT NOT NULL,     -- 累计交易数
-    
+
     -- 指定时间索引
     TIME INDEX (`timestamp`),
-    
+
     -- 设置标签（提高查询性能）
     PRIMARY KEY (task_id, agent_id, round)
 );

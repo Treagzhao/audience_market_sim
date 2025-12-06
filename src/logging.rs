@@ -67,6 +67,7 @@ pub struct TradeLog {
     product_id: u64,
     product_name: String,
     trade_result: String,
+    interval_relation: String,
     price: Option<f64>,
     factory_supply_range_lower: f64,
     factory_supply_range_upper: f64,
@@ -130,6 +131,23 @@ pub struct AgentCashLog {
     total_trades: u64, // 累计交易数
 }
 
+// Agent需求删除日志结构体
+pub struct AgentDemandRemovalLog {
+    timestamp: i64,
+    round: u64,
+    task_id: String,
+    agent_id: u64,
+    agent_name: String,
+    product_id: u64,
+    agent_cash: f64,
+    agent_pref_original_price: Option<f64>,
+    agent_pref_original_elastic: Option<f64>,
+    agent_pref_current_price: Option<f64>,
+    agent_pref_current_range_lower: Option<f64>,
+    agent_pref_current_range_upper: Option<f64>,
+    removal_reason: String,
+}
+
 impl TradeLog {
     pub fn new(
         round: u64,
@@ -139,6 +157,7 @@ impl TradeLog {
         factory: &Factory,
         product: &Product,
         trade_result: &TradeResult,
+        interval_relation: &str,
     ) -> Self {
         let (result_str, price) = match trade_result {
             TradeResult::NotMatched => ("NotMatched", None),
@@ -187,6 +206,7 @@ impl TradeLog {
             product_id: product.id(),
             product_name: product.name().to_string(),
             trade_result: result_str.to_string(),
+            interval_relation: interval_relation.to_string(),
             price,
             factory_supply_range_lower: lower,
             factory_supply_range_upper: upper,
@@ -308,6 +328,44 @@ impl AgentCashLog {
     }
 }
 
+impl AgentDemandRemovalLog {
+    pub fn new(
+        round: u64,
+        task_id: String,
+        agent_id: u64,
+        agent_name: String,
+        product_id: u64,
+        agent_cash: f64,
+        agent_pref_original_price: Option<f64>,
+        agent_pref_original_elastic: Option<f64>,
+        agent_pref_current_price: Option<f64>,
+        agent_pref_current_range_lower: Option<f64>,
+        agent_pref_current_range_upper: Option<f64>,
+        removal_reason: &str,
+    ) -> Self {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get system time")
+            .as_millis() as i64;
+
+        AgentDemandRemovalLog {
+            timestamp,
+            round,
+            task_id,
+            agent_id,
+            agent_name,
+            product_id,
+            agent_cash,
+            agent_pref_original_price,
+            agent_pref_original_elastic,
+            agent_pref_current_price,
+            agent_pref_current_range_lower,
+            agent_pref_current_range_upper,
+            removal_reason: removal_reason.to_string(),
+        }
+    }
+}
+
 // 日志记录器
 #[derive(Clone)]
 pub struct Logger {
@@ -332,6 +390,7 @@ impl Logger {
         factory: &Factory,
         product: &Product,
         trade_result: &TradeResult,
+        interval_relation: &str,
         trade_id: u64,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let log = TradeLog::new(
@@ -342,6 +401,7 @@ impl Logger {
             factory,
             product,
             trade_result,
+            interval_relation,
         );
 
         // 如果MySQL池未初始化，直接返回成功
@@ -353,13 +413,13 @@ impl Logger {
         let sql = r#"
             INSERT INTO trade_logs (
                 timestamp, round, trade_id, task_id, agent_id, agent_name, agent_cash,
-                factory_id, factory_name, product_id, product_name, trade_result, price,
+                factory_id, factory_name, product_id, product_name, trade_result, interval_relation, price,
                 factory_supply_range_lower, factory_supply_range_upper, factory_stock,
                 agent_pref_original_price, agent_pref_original_elastic, agent_pref_current_price,
                 agent_pref_current_range_lower, agent_pref_current_range_upper
             ) VALUES (
                 ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?,
                 ?, ?, ?,
                 ?, ?
@@ -373,13 +433,13 @@ impl Logger {
             r#"
                 INSERT INTO trade_logs (
                     timestamp, round, trade_id, task_id, agent_id, agent_name, agent_cash,
-                    factory_id, factory_name, product_id, product_name, trade_result, price,
+                    factory_id, factory_name, product_id, product_name, trade_result, interval_relation, price,
                     factory_supply_range_lower, factory_supply_range_upper, factory_stock,
                     agent_pref_original_price, agent_pref_original_elastic, agent_pref_current_price,
                     agent_pref_current_range_lower, agent_pref_current_range_upper
                 ) VALUES (
                     {}, {}, {}, '{}', {}, '{}', {},
-                    {}, '{}', {}, '{}', '{}', {},
+                    {}, '{}', {}, '{}', '{}', '{}', {},
                     {}, {}, {},
                     {}, {}, {},
                     {}, {}
@@ -397,6 +457,7 @@ impl Logger {
             log.product_id,
             log.product_name,
             log.trade_result,
+            log.interval_relation,
             log.price.unwrap_or(-1.0),
             log.factory_supply_range_lower,
             log.factory_supply_range_upper,
@@ -617,6 +678,75 @@ impl Logger {
 
         Ok(())
     }
+
+    pub fn log_agent_demand_removal(
+        &self,
+        round: u64,
+        agent_id: u64,
+        agent_name: String,
+        product_id: u64,
+        agent_cash: f64,
+        agent_pref_original_price: Option<f64>,
+        agent_pref_original_elastic: Option<f64>,
+        agent_pref_current_price: Option<f64>,
+        agent_pref_current_range_lower: Option<f64>,
+        agent_pref_current_range_upper: Option<f64>,
+        removal_reason: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let log = AgentDemandRemovalLog::new(
+            round,
+            self.task_id.clone(),
+            agent_id,
+            agent_name,
+            product_id,
+            agent_cash,
+            agent_pref_original_price,
+            agent_pref_original_elastic,
+            agent_pref_current_price,
+            agent_pref_current_range_lower,
+            agent_pref_current_range_upper,
+            removal_reason,
+        );
+
+        // 如果MySQL池未初始化，直接返回成功
+        let Some(pool) = MYSQL_POOL.get() else {
+            return Ok(());
+        };
+
+        // 准备SQL语句
+        let sql = format!(
+            r#"
+                INSERT INTO agent_demand_removal_logs (
+                    timestamp, round, task_id, agent_id, agent_name, product_id, agent_cash,
+                    agent_pref_original_price, agent_pref_original_elastic, agent_pref_current_price,
+                    agent_pref_current_range_lower, agent_pref_current_range_upper, removal_reason
+                ) VALUES (
+                    {}, {}, '{}', {}, '{}', {}, {},
+                    {}, {}, {},
+                    {}, {}, '{}'
+                )
+            "#,
+            log.timestamp,
+            log.round,
+            log.task_id,
+            log.agent_id,
+            log.agent_name,
+            log.product_id,
+            log.agent_cash,
+            log.agent_pref_original_price.unwrap_or(-1.0),
+            log.agent_pref_original_elastic.unwrap_or(-1.0),
+            log.agent_pref_current_price.unwrap_or(-1.0),
+            log.agent_pref_current_range_lower.unwrap_or(-1.0),
+            log.agent_pref_current_range_upper.unwrap_or(-1.0),
+            log.removal_reason
+        );
+
+        // 使用query方法执行SQL
+        let mut conn = pool.get_conn()?;
+        conn.query_drop(&sql)?;
+
+        Ok(())
+    }
 }
 
 // 全局日志记录器
@@ -638,6 +768,7 @@ pub fn log_trade(
     factory: &Factory,
     product: &Product,
     trade_result: &TradeResult,
+    interval_relation: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(logger) = &mut *LOGGER.lock().unwrap() {
         // 生成trade_id
@@ -646,7 +777,15 @@ pub fn log_trade(
         let trade_id = *counter;
 
         // 调用logger的log_trade方法
-        if let Err(e) = logger.log_trade(round, agent, factory, product, trade_result, trade_id) {
+        if let Err(e) = logger.log_trade(
+            round,
+            agent,
+            factory,
+            product,
+            trade_result,
+            interval_relation,
+            trade_id,
+        ) {
             eprintln!("Failed to log trade to MySQL: {}", e);
         }
     }
@@ -740,10 +879,37 @@ pub fn log_agent_cash(
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(logger) = &mut *LOGGER.lock().unwrap() {
         // 调用logger的log_agent_cash方法
-        if let Err(e) =
+        if let Err(e) = 
             logger.log_agent_cash(timestamp, round, agent_id, agent_name, cash, total_trades)
         {
             eprintln!("Failed to log agent cash to MySQL: {}", e);
+        }
+    }
+    Ok(())
+}
+
+// 记录Agent需求删除日志
+pub fn log_agent_demand_removal(
+    round: u64,
+    agent_id: u64,
+    agent_name: String,
+    product_id: u64,
+    agent_cash: f64,
+    agent_pref_original_price: Option<f64>,
+    agent_pref_original_elastic: Option<f64>,
+    agent_pref_current_price: Option<f64>,
+    agent_pref_current_range_lower: Option<f64>,
+    agent_pref_current_range_upper: Option<f64>,
+    removal_reason: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(logger) = &mut *LOGGER.lock().unwrap() {
+        // 调用logger的log_agent_demand_removal方法
+        if let Err(e) = 
+            logger.log_agent_demand_removal(round, agent_id, agent_name, product_id, agent_cash,
+            agent_pref_original_price, agent_pref_original_elastic, agent_pref_current_price,
+            agent_pref_current_range_lower, agent_pref_current_range_upper, removal_reason)
+        {
+            eprintln!("Failed to log agent demand removal to MySQL: {}", e);
         }
     }
     Ok(())

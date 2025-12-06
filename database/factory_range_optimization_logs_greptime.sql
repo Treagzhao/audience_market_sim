@@ -5,10 +5,10 @@ CREATE TABLE factory_range_optimization_logs (
     
     -- 标签字段（用于分组、过滤的高频查询字段）
     round BIGINT,                    -- 模拟轮次
-    task_id STRING,                  -- 任务ID
-    factory_id BIGINT,               -- 工厂ID
+    task_id STRING INVERTED INDEX,                  -- 任务ID
+    factory_id BIGINT INVERTED INDEX,               -- 工厂ID
     factory_name STRING,             -- 工厂名称
-    product_id BIGINT,               -- 产品ID
+    product_id BIGINT INVERTED INDEX,               -- 产品ID
     trade_result STRING,             -- 交易结果（Success/Failed）
     
     -- 字段（数值型数据，用于聚合分析）
