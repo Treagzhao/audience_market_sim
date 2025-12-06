@@ -141,24 +141,22 @@ impl Agent {
                 }
             } else {
                 // 不删除demand，更新range
-                // 以factory的supply_price_range的lower值为中心
-                let center = factory.supply_price_range().0;
-
-                // 当前range长度
+                // 在当前range的基础上，整体向下移动3%
                 let (old_min, old_max) = preference.current_range;
                 let old_length = old_max - old_min;
-                let new_length = old_length * 1.1; // 范围增大10%
-                let half_new_length = new_length / 2.0;
-
-                // 计算四舍五入后的half_new_length，确保最小单位是0.01
+                
+                // 计算向下移动的量：当前范围总长度的3%
+                let shift_amount = old_length * 0.03;
+                
+                // 四舍五入到最近的0.01
                 let round_to_nearest_cent = |x: f64| (x * 100.0).round() / 100.0;
-                let rounded_half_length = round_to_nearest_cent(half_new_length);
-
-                // 计算新的range，以center为中心，确保不小于0
-                let new_min = round_to_nearest_cent(center - rounded_half_length).max(0.0);
-                let mut new_max = round_to_nearest_cent(center + rounded_half_length);
-
-                // 确保max大于min
+                let rounded_shift = round_to_nearest_cent(shift_amount);
+                
+                // 计算新的范围，整体向下移动3%
+                let new_min = round_to_nearest_cent(old_min - rounded_shift).max(0.0);
+                let mut new_max = round_to_nearest_cent(old_max - rounded_shift);
+                
+                // 确保max大于min，且至少有0.01的差距
                 if new_max <= new_min {
                     new_max = new_min + 0.01;
                 }
@@ -182,6 +180,10 @@ impl Agent {
                     } else {
                         0.0
                     };
+                    
+                    // 计算新的中心：原来的中心向下移动rounded_shift
+                    let old_center = (old_min + old_max) / 2.0;
+                    let new_center = round_to_nearest_cent(old_center - rounded_shift);
 
                     // 调用日志记录函数
                     if let Err(e) = log_agent_range_adjustment(
@@ -195,7 +197,7 @@ impl Agent {
                         max_change_value,
                         min_change_ratio,
                         max_change_ratio,
-                        center,
+                        new_center,
                         "trade_failed",
                         None, // 交易失败，没有价格
                     ) {
