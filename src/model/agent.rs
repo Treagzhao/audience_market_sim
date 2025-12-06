@@ -20,6 +20,17 @@ pub struct Agent {
     demand: Arc<RwLock<HashMap<u64, bool>>>,
 }
 
+/// 区间关系枚举，表示两个区间之间的关系
+#[derive(Clone)]
+pub enum IntervalRelation {
+    /// 区间重叠，包含重叠范围
+    Overlapping((f64, f64)),
+    /// 代理的价格区间整体低于工厂的价格区间
+    AgentBelowFactory,
+    /// 代理的价格区间整体高于工厂的价格区间
+    AgentAboveFactory,
+}
+
 /// 交易结果枚举
 #[derive(Clone)]
 pub enum TradeResult {
@@ -110,7 +121,7 @@ impl Agent {
         demand.contains_key(&product_id)
     }
 
-    fn match_factory(&self, factory: &Factory) -> Option<(f64, f64)> {
+    fn match_factory(&self, factory: &Factory) -> Option<IntervalRelation> {
         let product_id = factory.product_id();
         let g = self.demand.read().unwrap();
         if !g.contains_key(&product_id) {
@@ -118,11 +129,32 @@ impl Agent {
         }
         let pg = self.preferences.read().unwrap();
         let p = pg.get(&product_id).unwrap();
-        interval_intersection(p.current_range, factory.supply_price_range())
+        
+        let agent_range = p.current_range;
+        let factory_range = factory.supply_price_range();
+        
+        match interval_intersection(agent_range, factory_range) {
+            Some(overlap) => Some(IntervalRelation::Overlapping(overlap)),
+            None => {
+                // 判断区间关系
+                let (agent_min, agent_max) = agent_range;
+                let (factory_min, factory_max) = factory_range;
+                
+                if agent_max < factory_min {
+                    // 代理的价格区间整体低于工厂的价格区间
+                    Some(IntervalRelation::AgentBelowFactory)
+                } else {
+                    // 代理的价格区间整体高于工厂的价格区间
+                    Some(IntervalRelation::AgentAboveFactory)
+                }
+            }
+        }
     }
 
     /// 处理交易失败的逻辑
-    fn handle_trade_failure(&mut self, factory: &Factory, product_id: u64) {
+    /// - `is_agent_below_factory`: 如果为true，表示代理价格低于工厂（商家售价太高），需要上移范围
+    /// - 如果为false，表示代理价格高于工厂或余额不足，需要下移范围
+    fn handle_trade_failure(&mut self, factory: &Factory, product_id: u64, round: u64, is_agent_below_factory: bool) {
         // 根据1-preference.elastic的概率决定是否删除demand
         let mut rng = rand::thread_rng();
 
@@ -141,25 +173,35 @@ impl Agent {
                 }
             } else {
                 // 不删除demand，更新range
-                // 在当前range的基础上，整体向下移动3%
                 let (old_min, old_max) = preference.current_range;
                 let old_length = old_max - old_min;
                 
-                // 计算向下移动的量：当前范围总长度的3%
+                // 计算移动的量：当前范围总长度的3%
                 let shift_amount = old_length * 0.03;
                 
                 // 四舍五入到最近的0.01
                 let round_to_nearest_cent = |x: f64| (x * 100.0).round() / 100.0;
                 let rounded_shift = round_to_nearest_cent(shift_amount);
                 
-                // 计算新的范围，整体向下移动3%
-                let new_min = round_to_nearest_cent(old_min - rounded_shift).max(0.0);
-                let mut new_max = round_to_nearest_cent(old_max - rounded_shift);
+                // 根据情况计算新的范围
+                let (new_min, new_max) = if is_agent_below_factory {
+                    // 商家售价太高，代理价格低于工厂，上移3%
+                    let new_min = round_to_nearest_cent(old_min + rounded_shift);
+                    let new_max = round_to_nearest_cent(old_max + rounded_shift);
+                    (new_min, new_max)
+                } else {
+                    // 商家售价太低或余额不足，下移3%
+                    let new_min = round_to_nearest_cent(old_min - rounded_shift).max(0.0);
+                    let new_max = round_to_nearest_cent(old_max - rounded_shift);
+                    (new_min, new_max)
+                };
                 
                 // 确保max大于min，且至少有0.01的差距
-                if new_max <= new_min {
-                    new_max = new_min + 0.01;
-                }
+                let new_max = if new_max <= new_min {
+                    new_min + 0.01
+                } else {
+                    new_max
+                };
 
                 // 计算变化量，如果小于0.01，则不更新
                 let min_change = (new_min - old_min).abs();
@@ -181,13 +223,14 @@ impl Agent {
                         0.0
                     };
                     
-                    // 计算新的中心：原来的中心向下移动rounded_shift
+                    // 计算新的中心
                     let old_center = (old_min + old_max) / 2.0;
-                    let new_center = round_to_nearest_cent(old_center - rounded_shift);
+                    let new_center = (new_min + new_max) / 2.0;
+                    let rounded_new_center = round_to_nearest_cent(new_center);
 
                     // 调用日志记录函数
                     if let Err(e) = log_agent_range_adjustment(
-                        0, // 注意：这里需要传入实际的round参数，目前代码中没有传递，暂时用0代替
+                        round, // 使用传入的round参数
                         self.id,
                         self.name.clone(),
                         product_id,
@@ -197,7 +240,7 @@ impl Agent {
                         max_change_value,
                         min_change_ratio,
                         max_change_ratio,
-                        new_center,
+                        rounded_new_center,
                         "trade_failed",
                         None, // 交易失败，没有价格
                     ) {
@@ -210,118 +253,131 @@ impl Agent {
         }
     }
 
-    pub fn trade(&mut self, factory: &Factory) -> TradeResult {
+    pub fn trade(&mut self, factory: &Factory, round: u64) -> TradeResult {
         let g = self.preferences.write().unwrap();
         if !g.contains_key(&factory.product_id()) {
             return TradeResult::NotMatched;
         }
         drop(g);
-        let merge_range = self.match_factory(factory);
+        let interval_relation = self.match_factory(factory);
 
         let product_id = factory.product_id();
-        if let Some(range) = merge_range {
-            // 根据range生成一个随机price值
-            let (mut min_price, mut max_price) = range;
-            // 确保范围有效，避免min_price等于max_price
-            if min_price >= max_price {
-                max_price = min_price + 0.01;
-            }
-            let mut rng = rand::thread_rng();
-            let mut price = rng.gen_range(min_price..max_price);
+        if let Some(relation) = interval_relation {
+            match relation {
+                IntervalRelation::Overlapping(range) => {
+                    // 根据range生成一个随机price值
+                    let (mut min_price, mut max_price) = range;
+                    // 确保范围有效，避免min_price等于max_price
+                    if min_price >= max_price {
+                        max_price = min_price + 0.01;
+                    }
+                    let mut rng = rand::thread_rng();
+                    let mut price = rng.gen_range(min_price..max_price);
 
-            // 检查price是否大于cash
-            if price > self.cash {
-                // 如果cash在交集范围内，就用cash作为price
-                if self.cash >= min_price && self.cash <= max_price {
-                    price = self.cash;
-                } else {
-                    // cash不在交集范围内，处理交易失败
-                    self.handle_trade_failure(factory, product_id);
+                    // 检查price是否大于cash
+                    if price > self.cash {
+                        // 如果cash在交集范围内，就用cash作为price
+                        if self.cash >= min_price && self.cash <= max_price {
+                            price = self.cash;
+                        } else {
+                            // cash不在交集范围内，余额不足，处理交易失败
+                            self.handle_trade_failure(factory, product_id, round, false);
+                            return TradeResult::Failed;
+                        }
+                    }
+
+                    // 四舍五入price到0.01
+                    let round_to_nearest_cent = |x: f64| (x * 100.0).round() / 100.0;
+                    let rounded_price = round_to_nearest_cent(price);
+
+                    // 如果价格低于0.01，认为是0.0，不能成交
+                    if rounded_price < 0.01 {
+                        self.handle_trade_failure(factory, product_id, round, false);
+                        return TradeResult::Failed;
+                    }
+
+                    let mut g = self.preferences.write().unwrap();
+                    let mut demand = self.demand.write().unwrap();
+                    demand.remove(&product_id);
+                    self.cash -= rounded_price;
+                    let preference = g.get_mut(&product_id).unwrap();
+                    preference.current_price = rounded_price;
+
+                    // 更新current_range，以新price为中点，范围比之前小10%
+                    let (old_min, old_max) = preference.current_range;
+                    let old_length = old_max - old_min;
+                    let new_length = old_length * 0.9; // 范围缩小10%
+                    let half_new_length = new_length / 2.0;
+
+                    // 计算半长并四舍五入到0.01
+                    let rounded_half_length = round_to_nearest_cent(half_new_length);
+
+                    // 从中点向两边扩展，确保以rounded_price为中心
+                    let new_min = round_to_nearest_cent(rounded_price - rounded_half_length).max(0.0);
+                    let mut new_max = round_to_nearest_cent(rounded_price + rounded_half_length);
+
+                    // 确保max大于min
+                    if new_max <= new_min {
+                        new_max = new_min + 0.01;
+                    }
+
+                    // 计算变化量，如果小于0.01，则不更新
+                    let min_change = (new_min - old_min).abs();
+                    let max_change = (new_max - old_max).abs();
+
+                    if min_change >= 0.01 || max_change >= 0.01 {
+                        // 计算变化比例（基于原范围长度）
+                        let old_length = old_max - old_min;
+                        let min_change_value = new_min - old_min;
+                        let max_change_value = new_max - old_max;
+                        let min_change_ratio = if old_length > 0.0 {
+                            min_change_value / old_length
+                        } else {
+                            0.0
+                        };
+                        let max_change_ratio = if old_length > 0.0 {
+                            max_change_value / old_length
+                        } else {
+                            0.0
+                        };
+
+                        // 调用日志记录函数
+                        if let Err(e) = log_agent_range_adjustment(
+                            round, // 使用传入的round参数
+                            self.id(),
+                            self.name().to_string(),
+                            product_id,
+                            (old_min, old_max),
+                            (new_min, new_max),
+                            min_change_value,
+                            max_change_value,
+                            min_change_ratio,
+                            max_change_ratio,
+                            rounded_price, // 交易成功，以成交价格为中心
+                            "trade_success",
+                            Some(rounded_price), // 交易成功，有价格
+                        ) {
+                            eprintln!("Failed to log agent range adjustment: {}", e);
+                        }
+
+                        preference.current_range = (new_min, new_max);
+                    }
+                    return TradeResult::Success(rounded_price);
+                },
+                IntervalRelation::AgentBelowFactory => {
+                    // 代理价格低于工厂，商家售价太高，上移3%
+                    self.handle_trade_failure(factory, product_id, round, true);
                     return TradeResult::Failed;
-                }
+                },
+                IntervalRelation::AgentAboveFactory => {
+                    // 代理价格高于工厂，商家售价太低，下移3%
+                    self.handle_trade_failure(factory, product_id, round, false);
+                    return TradeResult::Failed;
+                },
             }
-
-            // 四舍五入price到0.01
-            let round_to_nearest_cent = |x: f64| (x * 100.0).round() / 100.0;
-            let rounded_price = round_to_nearest_cent(price);
-
-            // 如果价格低于0.01，认为是0.0，不能成交
-            if rounded_price < 0.01 {
-                self.handle_trade_failure(factory, product_id);
-                return TradeResult::Failed;
-            }
-
-            let mut g = self.preferences.write().unwrap();
-            let mut demand = self.demand.write().unwrap();
-            demand.remove(&product_id);
-            self.cash -= rounded_price;
-            let preference = g.get_mut(&product_id).unwrap();
-            preference.current_price = rounded_price;
-
-            // 更新current_range，以新price为中点，范围比之前小10%
-            let (old_min, old_max) = preference.current_range;
-            let old_length = old_max - old_min;
-            let new_length = old_length * 0.9; // 范围缩小10%
-            let half_new_length = new_length / 2.0;
-
-            // 计算半长并四舍五入到0.01
-            let rounded_half_length = round_to_nearest_cent(half_new_length);
-
-            // 从中点向两边扩展，确保以rounded_price为中心
-            let new_min = round_to_nearest_cent(rounded_price - rounded_half_length).max(0.0);
-            let mut new_max = round_to_nearest_cent(rounded_price + rounded_half_length);
-
-            // 确保max大于min
-            if new_max <= new_min {
-                new_max = new_min + 0.01;
-            }
-
-            // 计算变化量，如果小于0.01，则不更新
-            let min_change = (new_min - old_min).abs();
-            let max_change = (new_max - old_max).abs();
-
-            if min_change >= 0.01 || max_change >= 0.01 {
-                // 计算变化比例（基于原范围长度）
-                let old_length = old_max - old_min;
-                let min_change_value = new_min - old_min;
-                let max_change_value = new_max - old_max;
-                let min_change_ratio = if old_length > 0.0 {
-                    min_change_value / old_length
-                } else {
-                    0.0
-                };
-                let max_change_ratio = if old_length > 0.0 {
-                    max_change_value / old_length
-                } else {
-                    0.0
-                };
-
-                // 调用日志记录函数
-                if let Err(e) = log_agent_range_adjustment(
-                    0, // 注意：这里需要传入实际的round参数，目前代码中没有传递，暂时用0代替
-                    self.id(),
-                    self.name().to_string(),
-                    product_id,
-                    (old_min, old_max),
-                    (new_min, new_max),
-                    min_change_value,
-                    max_change_value,
-                    min_change_ratio,
-                    max_change_ratio,
-                    rounded_price, // 交易成功，以成交价格为中心
-                    "trade_success",
-                    Some(rounded_price), // 交易成功，有价格
-                ) {
-                    eprintln!("Failed to log agent range adjustment: {}", e);
-                }
-
-                preference.current_range = (new_min, new_max);
-            }
-            return TradeResult::Success(rounded_price);
         } else {
-            // 没有交集，处理交易失败
-            self.handle_trade_failure(factory, product_id);
-            return TradeResult::Failed;
+            // 没有需求，返回未匹配
+            return TradeResult::NotMatched;
         }
     }
 }
@@ -519,7 +575,7 @@ mod tests {
         };
 
         // 执行交易
-        let result = agent.trade(&factory);
+        let result = agent.trade(&factory, 0);
 
         // 验证交易成功
         match result {
@@ -637,7 +693,7 @@ mod tests {
                 crate::model::factory::Factory::new(factory_id, factory_name.clone(), &product);
 
             // 执行交易
-            let result = agent.trade(&factory);
+            let result = agent.trade(&factory, 0);
 
             // 检查是否交易成功且cash变为0
             if let TradeResult::Success(_price) = result {
@@ -718,7 +774,7 @@ mod tests {
         };
 
         // 执行交易
-        let result = agent.trade(&factory);
+        let result = agent.trade(&factory, 0);
 
         // 验证交易失败
         match result {

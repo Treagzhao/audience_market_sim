@@ -213,7 +213,7 @@ fn process_product_trades(
                 } else {
                     let mut agent = a.write().unwrap();
                     // 调用agent的trade方法
-                    trade_result = agent.trade(factory);
+                    trade_result = agent.trade(factory, round);
                 }
                 // 调用工厂的deal方法
                 factory.deal(&trade_result, round);
