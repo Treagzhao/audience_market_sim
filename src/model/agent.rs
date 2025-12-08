@@ -210,23 +210,33 @@ impl Agent {
 
                 // 计算移动的量：当前范围总长度的3%
                 let shift_amount = old_length * 0.03;
+                // 计算扩大的量：当前范围总长度的1%
+                let expand_amount = old_length * 0.01;
 
                 // 四舍五入到最近的0.01
                 let round_to_nearest_cent = |x: f64| (x * 100.0).round() / 100.0;
-                let rounded_shift = round_to_nearest_cent(shift_amount);
+                let rounded_shift = round_to_nearest_cent(shift_amount).max(0.01);
+                let rounded_expand = round_to_nearest_cent(expand_amount).max(0.01);
 
                 // 根据情况计算新的范围
-                let (new_min, new_max) = if is_agent_below_factory {
+                let (mut new_min, mut new_max) = if is_agent_below_factory {
                     // 商家售价太高，代理价格低于工厂，上移3%
-                    let new_min = round_to_nearest_cent(old_min + rounded_shift);
-                    let new_max = round_to_nearest_cent(old_max + rounded_shift);
-                    (new_min, new_max)
+                    let shifted_min = round_to_nearest_cent(old_min + rounded_shift);
+                    let shifted_max = round_to_nearest_cent(old_max + rounded_shift);
+                    (shifted_min, shifted_max)
                 } else {
                     // 商家售价太低或余额不足，下移3%
-                    let new_min = round_to_nearest_cent(old_min - rounded_shift).max(0.0);
-                    let new_max = round_to_nearest_cent(old_max - rounded_shift);
-                    (new_min, new_max)
+                    let shifted_min = round_to_nearest_cent(old_min - rounded_shift);
+                    let shifted_max = round_to_nearest_cent(old_max - rounded_shift);
+                    (shifted_min, shifted_max)
                 };
+
+                // 扩大范围1%
+                new_min = round_to_nearest_cent(new_min - rounded_expand);
+                new_max = round_to_nearest_cent(new_max + rounded_expand);
+
+                // 确保最小值不小于0.0
+                new_min = new_min.max(0.0);
 
                 // 确保max大于min，且至少有0.01的差距
                 let new_max = if new_max <= new_min {
