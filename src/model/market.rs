@@ -1,4 +1,4 @@
-use crate::logging::log_trade;
+use crate::logging::{log_agent_cash, log_trade};
 use crate::model::agent::{Agent, TradeResult};
 use crate::model::factory::Factory;
 use crate::model::product::Product;
@@ -15,6 +15,7 @@ pub struct Market {
     factories: HashMap<u64, Arc<RwLock<Vec<Factory>>>>,
     products: Vec<Product>,
     agents: Arc<RwLock<Vec<Arc<RwLock<Agent>>>>>,
+    consecutive_zero_trades: u32, // 跟踪连续0成交量的轮次数
 }
 
 impl Market {
@@ -48,7 +49,7 @@ impl Market {
             let agent = Agent::new(
                 agent_id,
                 format!("Consumer_{}", agent_id),
-                100.0,
+                1000.0,
                 &products,
             );
             agents_vec.push(Arc::new(RwLock::new(agent)));
@@ -58,6 +59,7 @@ impl Market {
             factories,
             products,
             agents: Arc::new(RwLock::new(agents_vec)),
+            consecutive_zero_trades: 0, // 初始化连续0成交量轮次为0
         }
     }
 
@@ -65,7 +67,7 @@ impl Market {
         let mut rng = rand::thread_rng();
         let mut round = 1;
         let mut total_trades = 0;
-        const MAX_ROUND: u64 = 2000;
+        const MAX_ROUND: u64 = 8000;
 
         loop {
             println!("Starting round {}, Total trades: {}", round, total_trades);
@@ -110,10 +112,42 @@ impl Market {
             }
 
             // 汇总本轮交易数
-            total_trades += {
+            let current_round_trades = {
                 let r = round_trades.read().unwrap();
                 *r
             };
+            total_trades += current_round_trades;
+
+            // 更新连续0成交量轮次计数
+            if current_round_trades == 0 {
+                self.consecutive_zero_trades += 1;
+            } else {
+                self.consecutive_zero_trades = 0;
+            }
+
+            // 记录每个agent的现金情况
+            {
+                // 生成一个共享的timestamp，确保同一轮的所有log_cash事件使用同一个时间戳
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("Failed to get system time")
+                    .as_millis() as i64;
+
+                let agents = self.agents.read().unwrap();
+                for agent in agents.iter() {
+                    let a = agent.read().unwrap();
+                    if let Err(e) = log_agent_cash(
+                        timestamp,
+                        round,
+                        a.id(),
+                        a.name().to_string(),
+                        a.cash(),
+                        total_trades,
+                    ) {
+                        eprintln!("Failed to log agent cash: {}", e);
+                    }
+                }
+            }
 
             // 检查是否所有agent的余额为0
             let agents = self.agents.read().unwrap();
@@ -123,13 +157,19 @@ impl Market {
             });
 
             // 检查退出条件
-            if round > MAX_ROUND || all_agents_broke {
+            if round > MAX_ROUND || all_agents_broke || self.consecutive_zero_trades >= 20 {
                 println!("Simulation ending...");
                 if round > MAX_ROUND {
-                    println!("Reason: Reached maximum rounds ({}).", MAX_ROUND);
+                    println!("Reason: Reached maximum rounds ({})\n", MAX_ROUND);
                 }
                 if all_agents_broke {
-                    println!("Reason: All agents have zero or negative cash.");
+                    println!("Reason: All agents have zero or negative cash.\n");
+                }
+                if self.consecutive_zero_trades >= 20 {
+                    println!(
+                        "Reason: No trades for {} consecutive rounds.\n",
+                        self.consecutive_zero_trades
+                    );
                 }
                 break;
             }
@@ -189,15 +229,30 @@ fn process_product_trades(
                     agent.has_demand(product_id)
                 };
                 let mut trade_result = TradeResult::NotYet;
+                let mut interval_relation = None;
                 if !has_demand {
                     trade_result = TradeResult::NotMatched;
                 } else {
                     let mut agent = a.write().unwrap();
                     // 调用agent的trade方法
-                    trade_result = agent.trade(factory);
+                    (trade_result, interval_relation) = agent.trade(factory, round);
                 }
+                // 将interval_relation转换为字符串
+                let interval_relation_str = match &interval_relation {
+                    Some(rel) => match rel {
+                        crate::model::agent::IntervalRelation::Overlapping(_) => "Overlapping",
+                        crate::model::agent::IntervalRelation::AgentBelowFactory => {
+                            "AgentBelowFactory"
+                        }
+                        crate::model::agent::IntervalRelation::AgentAboveFactory => {
+                            "AgentAboveFactory"
+                        }
+                    },
+                    None => "None",
+                };
+
                 // 调用工厂的deal方法
-                factory.deal(&trade_result, round);
+                factory.deal(&trade_result, round, interval_relation);
 
                 // 如果交易成功，增加交易计数
                 if matches!(trade_result, crate::model::agent::TradeResult::Success(_)) {
@@ -205,8 +260,14 @@ fn process_product_trades(
                 }
 
                 // 记录交易日志
-                if let Err(e) = log_trade(round, a.clone(), factory, &product_clone, &trade_result)
-                {
+                if let Err(e) = log_trade(
+                    round,
+                    a.clone(),
+                    factory,
+                    &product_clone,
+                    &trade_result,
+                    interval_relation_str,
+                ) {
                     eprintln!("Failed to log trade: {}", e);
                 }
             }
