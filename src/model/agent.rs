@@ -2,10 +2,10 @@ use crate::logging::log_agent_range_adjustment;
 use crate::model::agent::preference::Preference;
 use crate::model::factory::Factory;
 use crate::model::product::Product;
-use log::debug;
 use crate::model::util::{
     gen_new_range_with_price, gen_price_in_range, interval_intersection, round_to_nearest_cent,
 };
+use log::debug;
 use mysql::prelude::{TextQuery, WithParams};
 use rand::Rng;
 use std::collections::HashMap;
@@ -81,6 +81,13 @@ impl Agent {
 
     pub fn cash(&self) -> f64 {
         self.cash
+    }
+
+    /// 为agent增加收入，在指定范围内随机生成一个金额
+    pub fn income(&mut self, range: (f64, f64)) {
+        let mut rng = rand::thread_rng();
+        let amount = rng.gen_range(range.0..range.1);
+        self.cash += amount;
     }
 
     pub fn desire(&mut self) {
@@ -191,7 +198,7 @@ impl Agent {
                         Some(preference.current_price),
                         Some(preference.current_range.0),
                         Some(preference.current_range.1),
-                        "elasticity_based_removal"
+                        "elasticity_based_removal",
                     ) {
                         eprintln!("Failed to log agent demand removal: {}", e);
                     }
@@ -296,7 +303,7 @@ impl Agent {
                 Some(preference.current_price),
                 Some(preference.current_range.0),
                 Some(preference.current_range.1),
-                reason
+                reason,
             ) {
                 eprintln!("Failed to log agent demand removal: {}", e);
             }
@@ -993,6 +1000,55 @@ mod tests {
             !agent.has_demand(product_id),
             "Agent should still not have demand for product {} after remove_demand",
             product_id
+        );
+    }
+
+    #[test]
+    fn test_income() {
+        // 创建一个测试agent
+        let id = 1;
+        let name = "test_agent".to_string();
+        let initial_cash = 100.0;
+        let products = Vec::new(); // 空产品列表
+        let mut agent = Agent::new(id, name, initial_cash, &products);
+
+        // 定义收入范围
+        let income_range = (50.0, 150.0);
+        let (min_income, max_income) = income_range;
+
+        // 记录初始cash
+        let initial_cash = agent.cash();
+
+        // 调用income方法
+        agent.income(income_range);
+
+        // 验证cash确实增加了
+        let final_cash = agent.cash();
+        assert!(
+            final_cash > initial_cash,
+            "Cash should increase after income"
+        );
+
+        // 验证增加的金额在指定范围内
+        let income_amount = final_cash - initial_cash;
+        assert!(
+            income_amount >= min_income,
+            "Income amount should be at least {}",
+            min_income
+        );
+        assert!(
+            income_amount <= max_income,
+            "Income amount should be at most {}",
+            max_income
+        );
+
+        // 测试多次调用，确保每次都能正确增加
+        let current_cash = agent.cash();
+        agent.income(income_range);
+        let new_cash = agent.cash();
+        assert!(
+            new_cash > current_cash,
+            "Cash should increase after second income"
         );
     }
 }

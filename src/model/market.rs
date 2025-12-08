@@ -151,9 +151,10 @@ impl Market {
 
             // 检查是否所有agent的余额为0
             let all_agents_broke = {
-                let agents = self.agents.read().unwrap();
+                let agents = self.agents.write().unwrap();
                 agents.iter().all(|agent| {
-                    let a = agent.read().unwrap();
+                    let mut a = agent.write().unwrap();
+                    a.income((5.0,13.0));
                     a.cash() < 0.01
                 })
             };
