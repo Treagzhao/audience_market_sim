@@ -176,7 +176,7 @@ impl Agent {
                 // 删除demand
                 if let Ok(mut demand) = self.demand.write() {
                     demand.remove(&product_id);
-                    
+
                     // 记录需求删除日志
                     let preference = g.get(&product_id).unwrap();
                     if let Err(e) = crate::logging::log_agent_demand_removal(
@@ -190,7 +190,7 @@ impl Agent {
                         Some(preference.current_price),
                         Some(preference.current_range.0),
                         Some(preference.current_range.1),
-                        "elasticity_based_removal"
+                        "elasticity_based_removal",
                     ) {
                         eprintln!("Failed to log agent demand removal: {}", e);
                     }
@@ -202,23 +202,33 @@ impl Agent {
 
                 // 计算移动的量：当前范围总长度的3%
                 let shift_amount = old_length * 0.03;
+                // 计算扩大的量：当前范围总长度的1%
+                let expand_amount = old_length * 0.01;
 
                 // 四舍五入到最近的0.01
                 let round_to_nearest_cent = |x: f64| (x * 100.0).round() / 100.0;
-                let rounded_shift = round_to_nearest_cent(shift_amount);
+                let rounded_shift = round_to_nearest_cent(shift_amount).max(0.01);
+                let rounded_expand = round_to_nearest_cent(expand_amount).max(0.01);
 
                 // 根据情况计算新的范围
-                let (new_min, new_max) = if is_agent_below_factory {
+                let (mut new_min, mut new_max) = if is_agent_below_factory {
                     // 商家售价太高，代理价格低于工厂，上移3%
-                    let new_min = round_to_nearest_cent(old_min + rounded_shift);
-                    let new_max = round_to_nearest_cent(old_max + rounded_shift);
-                    (new_min, new_max)
+                    let shifted_min = round_to_nearest_cent(old_min + rounded_shift);
+                    let shifted_max = round_to_nearest_cent(old_max + rounded_shift);
+                    (shifted_min, shifted_max)
                 } else {
                     // 商家售价太低或余额不足，下移3%
-                    let new_min = round_to_nearest_cent(old_min - rounded_shift).max(0.0);
-                    let new_max = round_to_nearest_cent(old_max - rounded_shift);
-                    (new_min, new_max)
+                    let shifted_min = round_to_nearest_cent(old_min - rounded_shift);
+                    let shifted_max = round_to_nearest_cent(old_max - rounded_shift);
+                    (shifted_min, shifted_max)
                 };
+
+                // 扩大范围1%
+                new_min = round_to_nearest_cent(new_min - rounded_expand);
+                new_max = round_to_nearest_cent(new_max + rounded_expand);
+
+                // 确保最小值不小于0.0
+                new_min = new_min.max(0.0);
 
                 // 确保max大于min，且至少有0.01的差距
                 let new_max = if new_max <= new_min {
@@ -280,7 +290,7 @@ impl Agent {
     fn remove_demand(&mut self, product_id: u64, round: u64, reason: &str) {
         let mut g = self.demand.write().unwrap();
         g.remove(&product_id);
-        
+
         // 记录需求删除日志
         let preferences = self.preferences.read().unwrap();
         if let Some(preference) = preferences.get(&product_id) {
@@ -295,7 +305,7 @@ impl Agent {
                 Some(preference.current_price),
                 Some(preference.current_range.0),
                 Some(preference.current_range.1),
-                reason
+                reason,
             ) {
                 eprintln!("Failed to log agent demand removal: {}", e);
             }
