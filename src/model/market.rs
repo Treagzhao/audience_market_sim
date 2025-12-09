@@ -154,7 +154,9 @@ impl Market {
                 let agents = self.agents.write().unwrap();
                 agents.iter().all(|agent| {
                     let mut a = agent.write().unwrap();
-                    a.income((5.0,13.0));
+                    let min = round as f64 * 1.1;
+                    let max = min * 1.1;
+                    a.income((min,max));
                     a.cash() < 0.01
                 })
             };
