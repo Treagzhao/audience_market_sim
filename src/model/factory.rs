@@ -17,6 +17,7 @@ pub struct Factory {
     u64_list: LinkedList<u64>,
     cash: f64,
     initial_stock: i16,
+    risk_appetite: f64,
 }
 
 impl Factory {
@@ -56,6 +57,7 @@ impl Factory {
             product_cost,
             cash,
             initial_stock: 0,
+            risk_appetite: rng.gen_range(0.1..0.9),
         }
     }
 
@@ -87,7 +89,7 @@ impl Factory {
     pub fn start_round(&mut self, round: u64) {
         // 计算每轮产量：当前现金余额的50% / 每单位生产成本，向下取整
         let production = if self.product_cost > 0.0 {
-            (self.cash * 0.5 / self.product_cost) as i16
+            (self.cash * self.risk_appetite / self.product_cost) as i16
         } else {
             0
         };
@@ -338,9 +340,9 @@ mod tests {
         let initial_cash = factory.cash();
         let product_cost = factory.product_cost;
 
-        // 计算预期产量：当前现金余额的50% / 每单位生产成本，向下取整
+        // 计算预期产量：当前现金余额 * 风险偏好 / 每单位生产成本，向下取整
         let expected_production = if product_cost > 0.0 {
-            (initial_cash * 0.5 / product_cost) as i16
+            (initial_cash * factory.risk_appetite / product_cost) as i16
         } else {
             0
         };
@@ -360,7 +362,7 @@ mod tests {
         // 测试第二轮
         let cash_before_round2 = factory.cash();
         let expected_production_round2 = if product_cost > 0.0 {
-            (cash_before_round2 * 0.5 / product_cost) as i16
+            (cash_before_round2 * factory.risk_appetite / product_cost) as i16
         } else {
             0
         };
@@ -579,9 +581,9 @@ mod tests {
         let initial_cash = factory.cash();
         let product_cost = factory.product_cost;
 
-        // 计算预期初始库存：当前现金余额的50% / 每单位生产成本，向下取整
+        // 计算预期初始库存：当前现金余额 * 风险偏好 / 每单位生产成本，向下取整
         let expected_initial_inventory = if product_cost > 0.0 {
-            (initial_cash * 0.5 / product_cost) as i16
+            (initial_cash * factory.risk_appetite / product_cost) as i16
         } else {
             0
         };
@@ -663,9 +665,9 @@ mod tests {
         let initial_cash = factory.cash();
         let product_cost = factory.product_cost;
 
-        // 计算预期初始库存：当前现金余额的50% / 每单位生产成本，向下取整
+        // 计算预期初始库存：当前现金余额 * 风险偏好 / 每单位生产成本，向下取整
         let expected_initial_inventory = if product_cost > 0.0 {
-            (initial_cash * 0.5 / product_cost) as i16
+            (initial_cash * factory.risk_appetite / product_cost) as i16
         } else {
             0
         };
