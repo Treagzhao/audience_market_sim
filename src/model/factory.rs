@@ -16,6 +16,7 @@ pub struct Factory {
     product_cost: f64,
     u64_list: LinkedList<u64>,
     cash: f64,
+    initial_stock: i16,
 }
 
 impl Factory {
@@ -40,7 +41,6 @@ impl Factory {
         // 生成上界：lower到upper_bound
         let upper = rng.gen_range(lower..upper_bound);
 
-
         // 确保product_cost大于0，避免除以0错误
         let product_cost = product.product_cost_distribution().sample(None).max(0.1);
         // 确保初始现金大于0，避免测试失败
@@ -55,6 +55,7 @@ impl Factory {
             u64_list: LinkedList::new(),
             product_cost,
             cash,
+            initial_stock: 0,
         }
     }
 
@@ -84,13 +85,13 @@ impl Factory {
 
     /// 开始新一轮
     pub fn start_round(&mut self, round: u64) {
-        // 计算每轮产量：当前现金余额 / 每单位生产成本，向下取整
+        // 计算每轮产量：当前现金余额的50% / 每单位生产成本，向下取整
         let production = if self.product_cost > 0.0 {
-            (self.cash / self.product_cost) as i16
+            (self.cash * 0.5 / self.product_cost) as i16
         } else {
             0
         };
-
+        self.initial_stock = production;
         // 扣除产量带来的成本
         let cost = production as f64 * self.product_cost;
         self.cash -= cost;
@@ -110,6 +111,9 @@ impl Factory {
         }
     }
 
+    pub fn get_initial_stock(&self) -> i16 {
+        self.initial_stock
+    }
     pub fn deal(
         &mut self,
         result: &TradeResult,
@@ -129,44 +133,18 @@ impl Factory {
                 return;
             }
             TradeResult::Failed => {
-                let mut ratio = 0.0;
-                if interval_relation.is_none() {
-                    ratio = -0.01;
-                } else {
-                    let interval_rel = interval_relation.unwrap();
-                    match interval_rel {
-                        IntervalRelation::Overlapping(_) => {
-                            ratio = -0.01;
-                        }
-                        IntervalRelation::AgentBelowFactory => {
-                            ratio = -0.01;
-                        }
-                        IntervalRelation::AgentAboveFactory => {
-                            ratio = 0.01;
-                        }
-                    }
-                }
+                let ratio = get_range_change_ratio(interval_relation);
                 let (lower, upper) = self.supply_price_range;
                 let range_length = upper - lower;
-                let (new_lower, new_upper) = shift_range_by_ratio(self.supply_price_range, ratio);
-
-                // 计算修改幅度
-                let lower_change = new_lower - lower;
-                let upper_change = new_upper - upper;
-                let total_change = (new_lower + new_upper) - (lower + upper);
-
-                // 计算变化比例（基于原范围长度）
-                let lower_change_ratio = if range_length > 0.0 {
-                    lower_change / range_length
-                } else {
-                    0.0
-                };
-                let upper_change_ratio = if range_length > 0.0 {
-                    upper_change / range_length
-                } else {
-                    0.0
-                };
-
+                let (new_lower, new_upper) =
+                    factory_shift_range_by_ratio(self.supply_price_range, self.product_cost, ratio);
+                let (
+                    lower_change_ratio,
+                    upper_change_ratio,
+                    total_change,
+                    lower_change,
+                    upper_change,
+                ) = get_range_change_info((lower, upper), (new_lower, new_upper));
                 // 调用日志记录函数
                 if let Err(e) = log_factory_range_optimization(
                     round,
@@ -190,24 +168,16 @@ impl Factory {
             TradeResult::Success(price) => {
                 // 交易成功，区间整体上移1%
                 let (lower, upper) = self.supply_price_range;
-                let (new_lower, new_upper) = shift_range_by_ratio(self.supply_price_range, 0.01);
-                let range_length = upper - lower;
-                // 计算修改幅度
-                let lower_change = new_lower - lower;
-                let upper_change = new_upper - upper;
-                let total_change = (new_lower + new_upper) - (lower + upper);
-
-                // 计算变化比例（基于原范围长度）
-                let lower_change_ratio = if range_length > 0.0 {
-                    lower_change / range_length
-                } else {
-                    0.0
-                };
-                let upper_change_ratio = if range_length > 0.0 {
-                    upper_change / range_length
-                } else {
-                    0.0
-                };
+                let (new_lower, new_upper) =
+                    factory_shift_range_by_ratio(self.supply_price_range, self.product_cost, 0.01);
+                let (
+                    lower_change_ratio,
+                    upper_change_ratio,
+                    total_change,
+                    lower_change,
+                    upper_change,
+                ) = get_range_change_info((lower, upper), (new_lower, new_upper));
+                // 调用日志记录函数
 
                 // 调用日志记录函数
                 if let Err(e) = log_factory_range_optimization(
@@ -238,6 +208,69 @@ impl Factory {
             }
         }
     }
+}
+
+fn factory_shift_range_by_ratio(range: (f64, f64), min_cost: f64, ratio: f64) -> (f64, f64) {
+    let (lower, upper) = shift_range_by_ratio(range, ratio);
+    if lower < min_cost {
+        let length = upper - lower;
+        (min_cost, min_cost + length)
+    } else {
+        (lower, upper)
+    }
+}
+
+fn get_range_change_info(
+    old_range: (f64, f64),
+    new_range: (f64, f64),
+) -> (f64, f64, f64, f64, f64) {
+    let (lower, upper) = old_range;
+    let range_length = upper - lower;
+    let (new_lower, new_upper) = new_range;
+    // 计算修改幅度
+    let lower_change = new_lower - lower;
+    let upper_change = new_upper - upper;
+    let total_change = (new_lower + new_upper) - (lower + upper);
+
+    // 计算变化比例（基于原范围长度）
+    let lower_change_ratio = if range_length > 0.0 {
+        lower_change / range_length
+    } else {
+        0.0
+    };
+    let upper_change_ratio = if range_length > 0.0 {
+        upper_change / range_length
+    } else {
+        0.0
+    };
+    (
+        lower_change_ratio,
+        upper_change_ratio,
+        total_change,
+        lower_change,
+        upper_change,
+    )
+}
+
+fn get_range_change_ratio(interval_relation: Option<IntervalRelation>) -> f64 {
+    let mut ratio = 0.0;
+    if interval_relation.is_none() {
+        ratio = -0.01;
+    } else {
+        let interval_rel = interval_relation.unwrap();
+        match interval_rel {
+            IntervalRelation::Overlapping(_) => {
+                ratio = -0.01;
+            }
+            IntervalRelation::AgentBelowFactory => {
+                ratio = -0.01;
+            }
+            IntervalRelation::AgentAboveFactory => {
+                ratio = 0.01;
+            }
+        }
+    }
+    ratio
 }
 
 #[cfg(test)]
@@ -305,9 +338,9 @@ mod tests {
         let initial_cash = factory.cash();
         let product_cost = factory.product_cost;
 
-        // 计算预期产量
+        // 计算预期产量：当前现金余额的50% / 每单位生产成本，向下取整
         let expected_production = if product_cost > 0.0 {
-            (initial_cash / product_cost) as i16
+            (initial_cash * 0.5 / product_cost) as i16
         } else {
             0
         };
@@ -327,7 +360,7 @@ mod tests {
         // 测试第二轮
         let cash_before_round2 = factory.cash();
         let expected_production_round2 = if product_cost > 0.0 {
-            (cash_before_round2 / product_cost) as i16
+            (cash_before_round2 * 0.5 / product_cost) as i16
         } else {
             0
         };
@@ -546,9 +579,9 @@ mod tests {
         let initial_cash = factory.cash();
         let product_cost = factory.product_cost;
 
-        // 计算预期初始库存
+        // 计算预期初始库存：当前现金余额的50% / 每单位生产成本，向下取整
         let expected_initial_inventory = if product_cost > 0.0 {
-            (initial_cash / product_cost) as i16
+            (initial_cash * 0.5 / product_cost) as i16
         } else {
             0
         };
@@ -630,9 +663,9 @@ mod tests {
         let initial_cash = factory.cash();
         let product_cost = factory.product_cost;
 
-        // 计算预期初始库存
+        // 计算预期初始库存：当前现金余额的50% / 每单位生产成本，向下取整
         let expected_initial_inventory = if product_cost > 0.0 {
-            (initial_cash / product_cost) as i16
+            (initial_cash * 0.5 / product_cost) as i16
         } else {
             0
         };
@@ -675,5 +708,213 @@ mod tests {
         let cash_before_failed_deal = factory.cash();
         factory.deal(&TradeResult::Failed, current_round, None);
         assert!((factory.cash() - cash_before_failed_deal).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_get_range_change_ratio() {
+        // 测试get_range_change_ratio函数的所有情况
+        use crate::model::agent::IntervalRelation;
+
+        // 情况1: interval_relation为None，应该返回-0.01
+        let ratio_none = get_range_change_ratio(None);
+        assert_eq!(ratio_none, -0.01);
+
+        // 情况2: Overlapping关系，应该返回-0.01
+        let ratio_overlapping =
+            get_range_change_ratio(Some(IntervalRelation::Overlapping((10.0, 20.0))));
+        assert_eq!(ratio_overlapping, -0.01);
+
+        // 情况3: AgentBelowFactory关系，应该返回-0.01
+        let ratio_below = get_range_change_ratio(Some(IntervalRelation::AgentBelowFactory));
+        assert_eq!(ratio_below, -0.01);
+
+        // 情况4: AgentAboveFactory关系，应该返回0.01
+        let ratio_above = get_range_change_ratio(Some(IntervalRelation::AgentAboveFactory));
+        assert_eq!(ratio_above, 0.01);
+    }
+
+    #[test]
+    fn test_get_range_change_info() {
+        // 测试get_range_change_info函数的各种情况
+
+        // 情况1: 正常情况 - 范围扩大
+        let old_range = (100.0, 200.0); // 原范围长度为100
+        let new_range = (90.0, 210.0); // 新范围更长
+        let result = get_range_change_info(old_range, new_range);
+
+        // 计算预期值
+        let expected_lower_change = 90.0 - 100.0; // -10.0
+        let expected_upper_change = 210.0 - 200.0; // 10.0
+        let expected_lower_change_ratio = expected_lower_change / 100.0; // -0.1
+        let expected_upper_change_ratio = expected_upper_change / 100.0; // 0.1
+        let expected_total_change = (90.0 + 210.0) - (100.0 + 200.0); // 0.0
+
+        assert_eq!(result.0, expected_lower_change_ratio);
+        assert_eq!(result.1, expected_upper_change_ratio);
+        assert_eq!(result.2, expected_total_change);
+        assert_eq!(result.3, expected_lower_change);
+        assert_eq!(result.4, expected_upper_change);
+
+        // 情况2: 正常情况 - 范围缩小
+        let old_range = (100.0, 200.0); // 原范围长度为100
+        let new_range = (110.0, 190.0); // 新范围更短
+        let result = get_range_change_info(old_range, new_range);
+
+        // 计算预期值
+        let expected_lower_change = 110.0 - 100.0; // 10.0
+        let expected_upper_change = 190.0 - 200.0; // -10.0
+        let expected_lower_change_ratio = expected_lower_change / 100.0; // 0.1
+        let expected_upper_change_ratio = expected_upper_change / 100.0; // -0.1
+        let expected_total_change = (110.0 + 190.0) - (100.0 + 200.0); // 0.0
+
+        assert_eq!(result.0, expected_lower_change_ratio);
+        assert_eq!(result.1, expected_upper_change_ratio);
+        assert_eq!(result.2, expected_total_change);
+        assert_eq!(result.3, expected_lower_change);
+        assert_eq!(result.4, expected_upper_change);
+
+        // 情况3: 正常情况 - 范围上移
+        let old_range = (100.0, 200.0); // 原范围
+        let new_range = (110.0, 210.0); // 新范围上移
+        let result = get_range_change_info(old_range, new_range);
+
+        // 计算预期值
+        let expected_lower_change = 110.0 - 100.0; // 10.0
+        let expected_upper_change = 210.0 - 200.0; // 10.0
+        let expected_lower_change_ratio = expected_lower_change / 100.0; // 0.1
+        let expected_upper_change_ratio = expected_upper_change / 100.0; // 0.1
+        let expected_total_change = (110.0 + 210.0) - (100.0 + 200.0); // 20.0
+
+        assert_eq!(result.0, expected_lower_change_ratio);
+        assert_eq!(result.1, expected_upper_change_ratio);
+        assert_eq!(result.2, expected_total_change);
+        assert_eq!(result.3, expected_lower_change);
+        assert_eq!(result.4, expected_upper_change);
+
+        // 情况4: 正常情况 - 范围下移
+        let old_range = (100.0, 200.0); // 原范围
+        let new_range = (90.0, 190.0); // 新范围下移
+        let result = get_range_change_info(old_range, new_range);
+
+        // 计算预期值
+        let expected_lower_change = 90.0 - 100.0; // -10.0
+        let expected_upper_change = 190.0 - 200.0; // -10.0
+        let expected_lower_change_ratio = expected_lower_change / 100.0; // -0.1
+        let expected_upper_change_ratio = expected_upper_change / 100.0; // -0.1
+        let expected_total_change = (90.0 + 190.0) - (100.0 + 200.0); // -20.0
+
+        assert_eq!(result.0, expected_lower_change_ratio);
+        assert_eq!(result.1, expected_upper_change_ratio);
+        assert_eq!(result.2, expected_total_change);
+        assert_eq!(result.3, expected_lower_change);
+        assert_eq!(result.4, expected_upper_change);
+
+        // 情况5: 边界情况 - 原范围长度为0
+        let old_range = (150.0, 150.0); // 原范围长度为0
+        let new_range = (140.0, 160.0); // 新范围有长度
+        let result = get_range_change_info(old_range, new_range);
+
+        // 当原范围长度为0时，变化比例应该为0
+        assert_eq!(result.0, 0.0);
+        assert_eq!(result.1, 0.0);
+        assert_eq!(result.2, (140.0 + 160.0) - (150.0 + 150.0)); // 0.0
+        assert_eq!(result.3, 140.0 - 150.0); // -10.0
+        assert_eq!(result.4, 160.0 - 150.0); // 10.0
+
+        // 情况6: 边界情况 - 新范围与旧范围相同
+        let old_range = (100.0, 200.0);
+        let new_range = (100.0, 200.0);
+        let result = get_range_change_info(old_range, new_range);
+
+        // 所有变化都应该为0
+        assert_eq!(result.0, 0.0);
+        assert_eq!(result.1, 0.0);
+        assert_eq!(result.2, 0.0);
+        assert_eq!(result.3, 0.0);
+        assert_eq!(result.4, 0.0);
+    }
+
+    #[test]
+    fn test_factory_shift_range_by_ratio() {
+        // 测试factory_shift_range_by_ratio函数的各种情况
+
+        // 情况1: 正常情况 - 调整后的下界大于最小成本
+        let range = (100.0, 200.0);
+        let min_cost = 50.0;
+        let ratio = 0.01; // 1% 增长
+        let result = factory_shift_range_by_ratio(range, min_cost, ratio);
+
+        // 预期结果：range的上下界都增长1%
+        let expected_lower = 101.0;
+        let expected_upper = 202.0;
+        assert_eq!(result.0, expected_lower);
+        assert_eq!(result.1, expected_upper);
+
+        // 情况2: 边界情况 - 调整后的下界小于最小成本
+        let range = (100.0, 200.0);
+        let min_cost = 105.0;
+        let ratio = -0.1; // 10% 下降
+        let result = factory_shift_range_by_ratio(range, min_cost, ratio);
+
+        // 预期结果：下界被调整为min_cost，范围长度保持不变
+        let expected_lower = min_cost;
+        let expected_upper = min_cost + (200.0 - 100.0) * 0.9; // 105.0 + 90.0 = 195.0
+        assert_eq!(result.0, expected_lower);
+        assert_eq!(result.1, expected_upper);
+
+        // 情况3: 正常情况 - 比例为负，范围下移，但下界仍大于最小成本
+        let range = (200.0, 300.0);
+        let min_cost = 150.0;
+        let ratio = -0.1; // 10% 下降
+        let result = factory_shift_range_by_ratio(range, min_cost, ratio);
+
+        // 预期结果：range的上下界都下降10%
+        let expected_lower = 180.0;
+        let expected_upper = 270.0;
+        assert_eq!(result.0, expected_lower);
+        assert_eq!(result.1, expected_upper);
+
+        // 情况4: 边界情况 - 比例为0，范围不变
+        let range = (100.0, 200.0);
+        let min_cost = 50.0;
+        let ratio = 0.0;
+        let result = factory_shift_range_by_ratio(range, min_cost, ratio);
+
+        // 预期结果：range保持不变
+        assert_eq!(result.0, 100.0);
+        assert_eq!(result.1, 200.0);
+
+        // 情况5: 边界情况 - 初始范围的下界就是最小成本
+        let range = (100.0, 200.0);
+        let min_cost = 100.0;
+        let ratio = 0.05; // 5% 增长
+        let result = factory_shift_range_by_ratio(range, min_cost, ratio);
+
+        // 预期结果：range的上下界都增长5%
+        let expected_lower = 105.0;
+        let expected_upper = 210.0;
+        assert_eq!(result.0, expected_lower);
+        assert_eq!(result.1, expected_upper);
+
+        // 情况6: 边界情况 - 范围非常小
+        let range = (0.01, 0.02);
+        let min_cost = 0.01;
+        let ratio = 0.1; // 10% 增长
+        let result = factory_shift_range_by_ratio(range, min_cost, ratio);
+
+        // 预期结果：范围至少保持不变或增长
+        assert!(result.0 >= 0.01);
+        assert!(result.1 > result.0);
+        assert!(result.1 >= 0.02);
+
+        // 情况7: 边界情况 - 调整后的下界刚好等于最小成本
+        let range = (100.0, 200.0);
+        let min_cost = 90.0;
+        let ratio = -0.1; // 10% 下降
+        let result = factory_shift_range_by_ratio(range, min_cost, ratio);
+
+        // 预期结果：下界等于min_cost，上界为min_cost + 90.0
+        assert_eq!(result.0, min_cost);
+        assert_eq!(result.1, min_cost + 90.0);
     }
 }
