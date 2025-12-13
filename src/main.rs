@@ -34,6 +34,8 @@ fn init_products() -> Vec<crate::model::product::Product> {
         let std_dev_price = product_value.get("std_dev_price").and_then(Value::as_float).expect("Failed to get std_dev_price");
         let mean_elastic = product_value.get("mean_elastic").and_then(Value::as_float).expect("Failed to get mean_elastic");
         let std_dev_elastic = product_value.get("std_dev_elastic").and_then(Value::as_float).expect("Failed to get std_dev_elastic");
+        let mean_product_cost = product_value.get("mean_product_cost").and_then(Value::as_float).expect("Failed to get mean_product_cost");
+        let std_dev_product_cost = product_value.get("std_dev_product_cost").and_then(Value::as_float).expect("Failed to get std_dev_product_cost");
         
         // 创建价格分布
         let price_distribution = NormalDistribution::new(mean_price, id, format!("{}_price_dist", name), std_dev_price);
@@ -41,8 +43,11 @@ fn init_products() -> Vec<crate::model::product::Product> {
         // 创建弹性分布
         let elastic_distribution = NormalDistribution::new(mean_elastic, id, format!("{}_elastic_dist", name), std_dev_elastic);
         
+        // 创建成本分布
+        let product_cost_distribution = NormalDistribution::new(mean_product_cost, id, format!("{}_cost_dist", name), std_dev_product_cost);
+        
         // 创建Product对象
-        let product = crate::model::product::Product::from(id, name, price_distribution, elastic_distribution);
+        let product = crate::model::product::Product::from(id, name, price_distribution, elastic_distribution, product_cost_distribution);
         products.push(product);
     }
     

@@ -148,6 +148,21 @@ pub struct AgentDemandRemovalLog {
     removal_reason: String,
 }
 
+// 工厂轮次结束日志结构体
+pub struct FactoryEndOfRoundLog {
+    timestamp: i64,
+    round: u64,
+    task_id: String,
+    factory_id: u64,
+    factory_name: String,
+    product_id: u64,
+    cash: f64,
+    initial_stock: i16,
+    remaining_stock: i16,
+    supply_range_lower: f64,
+    supply_range_upper: f64,
+}
+
 impl TradeLog {
     pub fn new(
         round: u64,
@@ -362,6 +377,36 @@ impl AgentDemandRemovalLog {
             agent_pref_current_range_lower,
             agent_pref_current_range_upper,
             removal_reason: removal_reason.to_string(),
+        }
+    }
+}
+
+impl FactoryEndOfRoundLog {
+    pub fn new(
+        timestamp: i64,
+        round: u64,
+        task_id: String,
+        factory_id: u64,
+        factory_name: String,
+        product_id: u64,
+        cash: f64,
+        initial_stock: i16,
+        remaining_stock: i16,
+        supply_range_lower: f64,
+        supply_range_upper: f64,
+    ) -> Self {
+        FactoryEndOfRoundLog {
+            timestamp,
+            round,
+            task_id,
+            factory_id,
+            factory_name,
+            product_id,
+            cash,
+            initial_stock,
+            remaining_stock,
+            supply_range_lower,
+            supply_range_upper,
         }
     }
 }
@@ -747,6 +792,69 @@ impl Logger {
 
         Ok(())
     }
+
+    pub fn log_factory_end_of_round(
+        &self,
+        timestamp: i64,
+        round: u64,
+        factory_id: u64,
+        factory_name: String,
+        product_id: u64,
+        cash: f64,
+        initial_stock: i16,
+        remaining_stock: i16,
+        supply_range_lower: f64,
+        supply_range_upper: f64,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let log = FactoryEndOfRoundLog::new(
+            timestamp,
+            round,
+            self.task_id.clone(),
+            factory_id,
+            factory_name,
+            product_id,
+            cash,
+            initial_stock,
+            remaining_stock,
+            supply_range_lower,
+            supply_range_upper,
+        );
+
+        // 如果MySQL池未初始化，直接返回成功
+        let Some(pool) = MYSQL_POOL.get() else {
+            return Ok(());
+        };
+
+        // 准备SQL语句
+        let sql = format!(
+            r#"
+                INSERT INTO factory_end_of_round_logs (
+                    timestamp, round, task_id, factory_id, factory_name, product_id,
+                    cash, initial_stock, remaining_stock, supply_range_lower, supply_range_upper
+                ) VALUES (
+                    {}, {}, '{}', {}, '{}', {},
+                    {}, {}, {}, {}, {}
+                )
+            "#,
+            log.timestamp,
+            log.round,
+            log.task_id,
+            log.factory_id,
+            log.factory_name,
+            log.product_id,
+            log.cash,
+            log.initial_stock,
+            log.remaining_stock,
+            log.supply_range_lower,
+            log.supply_range_upper
+        );
+
+        // 使用query方法执行SQL
+        let mut conn = pool.get_conn()?;
+        conn.query_drop(&sql)?;
+
+        Ok(())
+    }
 }
 
 // 全局日志记录器
@@ -879,7 +987,7 @@ pub fn log_agent_cash(
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(logger) = &mut *LOGGER.lock().unwrap() {
         // 调用logger的log_agent_cash方法
-        if let Err(e) = 
+        if let Err(e) =
             logger.log_agent_cash(timestamp, round, agent_id, agent_name, cash, total_trades)
         {
             eprintln!("Failed to log agent cash to MySQL: {}", e);
@@ -904,12 +1012,53 @@ pub fn log_agent_demand_removal(
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(logger) = &mut *LOGGER.lock().unwrap() {
         // 调用logger的log_agent_demand_removal方法
-        if let Err(e) = 
-            logger.log_agent_demand_removal(round, agent_id, agent_name, product_id, agent_cash,
-            agent_pref_original_price, agent_pref_original_elastic, agent_pref_current_price,
-            agent_pref_current_range_lower, agent_pref_current_range_upper, removal_reason)
-        {
+        if let Err(e) = logger.log_agent_demand_removal(
+            round,
+            agent_id,
+            agent_name,
+            product_id,
+            agent_cash,
+            agent_pref_original_price,
+            agent_pref_original_elastic,
+            agent_pref_current_price,
+            agent_pref_current_range_lower,
+            agent_pref_current_range_upper,
+            removal_reason,
+        ) {
             eprintln!("Failed to log agent demand removal to MySQL: {}", e);
+        }
+    }
+    Ok(())
+}
+
+// 记录工厂轮次结束日志
+pub fn log_factory_end_of_round(
+    timestamp: i64,
+    round: u64,
+    factory_id: u64,
+    factory_name: String,
+    product_id: u64,
+    cash: f64,
+    initial_stock: i16,
+    remaining_stock: i16,
+    supply_range_lower: f64,
+    supply_range_upper: f64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(logger) = &mut *LOGGER.lock().unwrap() {
+        // 调用logger的log_factory_end_of_round方法
+        if let Err(e) = logger.log_factory_end_of_round(
+            timestamp,
+            round,
+            factory_id,
+            factory_name,
+            product_id,
+            cash,
+            initial_stock,
+            remaining_stock,
+            supply_range_lower,
+            supply_range_upper,
+        ) {
+            eprintln!("Failed to log factory end of round to MySQL: {}", e);
         }
     }
     Ok(())

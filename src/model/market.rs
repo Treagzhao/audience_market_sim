@@ -1,4 +1,4 @@
-use crate::logging::{log_agent_cash, log_trade};
+use crate::logging::{log_agent_cash, log_factory_end_of_round, log_trade};
 use crate::model::agent::{Agent, TradeResult};
 use crate::model::factory::Factory;
 use crate::model::product::Product;
@@ -147,6 +147,34 @@ impl Market {
                         eprintln!("Failed to log agent cash: {}", e);
                     }
                 }
+
+                // 记录每个工厂的轮次结束日志，使用与agent现金日志相同的timestamp
+                for (_product_id, factory_list_arc) in self.factories.iter() {
+                    let factory_list = factory_list_arc.read().unwrap();
+                    for factory in factory_list.iter() {
+                        let product_id = factory.product_id();
+                        let (supply_range_lower, supply_range_upper) = factory.supply_price_range();
+                        // 本轮的初始产量就是本轮开始时的产量，也就是当前轮次的库存
+                        let initial_stock = factory.get_stock(round);
+                        // 剩余库存就是初始产量减去本轮的交易量，但由于我们没有直接记录交易量，
+                        // 我们可以暂时使用initial_stock作为remaining_stock，后续可以考虑在Factory中添加交易量记录
+                        let remaining_stock = initial_stock;
+                        if let Err(e) = log_factory_end_of_round(
+                            timestamp,
+                            round,
+                            factory.id(),
+                            factory.name().to_string(),
+                            product_id,
+                            factory.cash(),
+                            initial_stock,
+                            remaining_stock,
+                            supply_range_lower,
+                            supply_range_upper,
+                        ) {
+                            eprintln!("Failed to log factory end of round: {}", e);
+                        }
+                    }
+                }
             }
 
             // 检查是否所有agent的余额为0
@@ -154,7 +182,7 @@ impl Market {
                 let agents = self.agents.write().unwrap();
                 agents.iter().all(|agent| {
                     let mut a = agent.write().unwrap();
-                    a.income((5.0,13.0));
+                    a.income((50.0, 100.0));
                     a.cash() < 0.01
                 })
             };
