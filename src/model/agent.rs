@@ -448,6 +448,12 @@ mod tests {
                     "elastic_dist_1".to_string(),
                     0.1,
                 ),
+                crate::entity::normal_distribute::NormalDistribution::new(
+                    5.0,
+                    1,
+                    "cost_dist_1".to_string(),
+                    1.0,
+                ),
             ),
             Product::from(
                 2,
@@ -464,6 +470,12 @@ mod tests {
                     "elastic_dist_2".to_string(),
                     0.1,
                 ),
+                crate::entity::normal_distribute::NormalDistribution::new(
+                    10.0,
+                    2,
+                    "cost_dist_2".to_string(),
+                    2.0,
+                ),
             ),
             Product::from(
                 3,
@@ -479,6 +491,12 @@ mod tests {
                     3,
                     "elastic_dist_3".to_string(),
                     0.1,
+                ),
+                crate::entity::normal_distribute::NormalDistribution::new(
+                    15.0,
+                    3,
+                    "cost_dist_3".to_string(),
+                    3.0,
                 ),
             ),
         ];
@@ -535,6 +553,12 @@ mod tests {
                 product_id,
                 "elastic_dist".to_string(),
                 0.1,
+            ),
+            crate::entity::normal_distribute::NormalDistribution::new(
+                25.0,
+                product_id,
+                "cost_dist".to_string(),
+                3.0,
             ),
         );
 
@@ -692,6 +716,12 @@ mod tests {
                     "elastic_dist".to_string(),
                     0.1,
                 ),
+                crate::entity::normal_distribute::NormalDistribution::new(
+                    30.0,
+                    product_id,
+                    "cost_dist".to_string(),
+                    5.0,
+                ),
             );
 
             // 每次尝试创建新的Agent和Factory
@@ -765,6 +795,12 @@ mod tests {
                 product_id,
                 "elastic_dist".to_string(),
                 0.1,
+            ),
+            crate::entity::normal_distribute::NormalDistribution::new(
+                25.0,
+                product_id,
+                "cost_dist".to_string(),
+                3.0,
             ),
         );
 
@@ -844,6 +880,12 @@ mod tests {
                 "elastic_dist".to_string(),
                 0.1,
             ),
+            crate::entity::normal_distribute::NormalDistribution::new(
+                5.0,
+                product_id,
+                "cost_dist".to_string(),
+                1.0,
+            ),
         );
 
         // 创建一个测试agent
@@ -886,6 +928,12 @@ mod tests {
                 "elastic_dist".to_string(),
                 0.1,
             ),
+            crate::entity::normal_distribute::NormalDistribution::new(
+                5.0,
+                product_id,
+                "cost_dist".to_string(),
+                1.0,
+            ),
         );
 
         // 创建一个测试agent
@@ -927,6 +975,12 @@ mod tests {
                 product_id,
                 "elastic_dist".to_string(),
                 0.1,
+            ),
+            crate::entity::normal_distribute::NormalDistribution::new(
+                5.0,
+                product_id,
+                "cost_dist".to_string(),
+                1.0,
             ),
         );
 
@@ -979,6 +1033,12 @@ mod tests {
                 product_id,
                 "elastic_dist".to_string(),
                 0.1,
+            ),
+            crate::entity::normal_distribute::NormalDistribution::new(
+                5.0,
+                product_id,
+                "cost_dist".to_string(),
+                1.0,
             ),
         );
 

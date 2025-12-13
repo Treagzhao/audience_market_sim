@@ -5,6 +5,8 @@ mean_price = 15.0
 std_dev_price = 5.0
 mean_elastic = 0.05
 std_dev_elastic = 0.02
+mean_product_cost = 3.5      # 成本压低！这是合成糊糊，不是法式面包
+std_dev_product_cost = 0.5
 #
 #[[products]]
 #id = 2
