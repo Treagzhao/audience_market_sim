@@ -414,7 +414,6 @@ impl FactoryEndOfRoundLog {
 // 日志记录器
 #[derive(Clone)]
 pub struct Logger {
-    trade_counter: Arc<Mutex<u64>>,
     task_id: String,
 }
 
@@ -423,7 +422,6 @@ impl Logger {
         init_mysql_client();
 
         Ok(Logger {
-            trade_counter: Arc::new(Mutex::new(0)),
             task_id,
         })
     }
@@ -879,11 +877,6 @@ pub fn log_trade(
     interval_relation: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(logger) = &mut *LOGGER.lock().unwrap() {
-        // 生成trade_id
-        let mut counter = logger.trade_counter.lock().unwrap();
-        *counter += 1;
-        let trade_id = *counter;
-
         // 调用logger的log_trade方法
         if let Err(e) = logger.log_trade(
             round,
@@ -892,7 +885,7 @@ pub fn log_trade(
             product,
             trade_result,
             interval_relation,
-            trade_id,
+            0,
         ) {
             eprintln!("Failed to log trade to MySQL: {}", e);
         }
@@ -953,7 +946,23 @@ pub fn log_agent_range_adjustment(
     adjustment_type: &str,
     price: Option<f64>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if let Some(logger) = &mut *LOGGER.lock().unwrap() {
+    println!(
+        "log_agent_range_adjustment checkpoint 1 agent_id:{:?} product_id:{:?}",
+        agent_id,
+        product_id
+    );
+    let mut logger = &mut *LOGGER.lock().unwrap();
+    println!(
+        "log_agent_range_adjustment checkpoint 2 agent_id:{:?} product_id:{:?}",
+        agent_id,
+        product_id
+    );
+    if let Some(logger) =  logger{
+        println!(
+            "log_agent_range_adjustment checkpoint 3 agent_id:{:?} product_id:{:?}",
+            agent_id,
+            product_id
+        );
         // 调用logger的log_agent_range_adjustment方法
         if let Err(e) = logger.log_agent_range_adjustment(
             round,

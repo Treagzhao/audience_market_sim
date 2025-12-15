@@ -112,7 +112,7 @@ impl Agent {
                 // 随机选择一个商品ID
                 let index = rng.gen_range(0..preferences.len());
                 let product_id = *preferences.keys().nth(index).unwrap();
-
+                drop(preferences);
                 // 检查该商品是否已经在demand中
 
                 let demand = d.try_read();
@@ -188,16 +188,30 @@ impl Agent {
             factory.id()
         );
         let mut g = self.preferences.write().unwrap();
+        println!(
+            "handle trade failure checkpoint 2 agent_id:{} factory_id:{:?}",
+            self.id,
+            factory.id()
+        );
         if let Some(preference) = g.get_mut(&product_id) {
             // 计算概率：弹性值本身，弹性越大，越容易删除需求
             let delete_probability = preference.original_elastic;
-
+            println!(
+                "handle trade failure checkpoint 3 agent_id:{} factory_id:{:?}",
+                self.id,
+                factory.id()
+            );
             // 生成随机数（0.0到1.0）
             let random_value = rng.gen_range(0.0..1.0);
 
             if random_value < delete_probability {
                 // 删除demand
                 if let Ok(mut demand) = self.demand.write() {
+                    println!(
+                        "handle trade failure checkpoint 5 agent_id:{} factory_id:{:?}",
+                        self.id,
+                        factory.id()
+                    );
                     demand.remove(&product_id);
 
                     // 记录需求删除日志
@@ -456,7 +470,11 @@ impl Agent {
                     } else {
                         0.0
                     };
-
+                    println!(
+                        "inner check point 3 branch 1.3 agent_id:{:?} factory_id:{:?}",
+                        self.id(),
+                        factory.id()
+                    );
                     // 调用日志记录函数
                     if let Err(e) = log_agent_range_adjustment(
                         round, // 使用传入的round参数
