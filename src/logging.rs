@@ -1010,7 +1010,10 @@ pub fn log_agent_demand_removal(
     agent_pref_current_range_upper: Option<f64>,
     removal_reason: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if let Some(logger) = &mut *LOGGER.lock().unwrap() {
+    println!("log_agent_demand_removal checkpoint 1 agent_id:{:?} product_id:{:?}",agent_id,product_id);
+    let mut logger = &mut *LOGGER.lock().unwrap();
+    println!("log_agent_demand_removal checkpoint 2 agent_id:{:?} product_id:{:?}",agent_id,product_id);
+    if let Some(logger) = logger {
         // 调用logger的log_agent_demand_removal方法
         if let Err(e) = logger.log_agent_demand_removal(
             round,

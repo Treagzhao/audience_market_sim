@@ -25,7 +25,7 @@ pub struct Agent {
 }
 
 /// 区间关系枚举，表示两个区间之间的关系
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum IntervalRelation {
     /// 区间重叠，包含重叠范围
     Overlapping((f64, f64)),
@@ -98,26 +98,37 @@ impl Agent {
             let mut rng = rand::thread_rng();
             loop {
                 // 从preferences中随机选择一个商品ID
-                let product_id = {
-                    let preferences = p.read().unwrap();
-                    if preferences.is_empty() {
-                        continue; // 如果preferences为空，跳过本次循环
-                    }
 
-                    // 随机选择一个商品ID
-                    let index = rng.gen_range(0..preferences.len());
-                    *preferences.keys().nth(index).unwrap()
-                };
+                let preferences = p.try_read();
+                if let Err(_) = preferences {
+                    // 如果无法获取preferences的读锁，跳过本次循环
+                    continue;
+                }
+                let preferences = preferences.unwrap();
+                if preferences.is_empty() {
+                    continue; // 如果preferences为空，跳过本次循环
+                }
+
+                // 随机选择一个商品ID
+                let index = rng.gen_range(0..preferences.len());
+                let product_id = *preferences.keys().nth(index).unwrap();
 
                 // 检查该商品是否已经在demand中
-                let is_already_demanded = {
-                    let demand = d.read().unwrap();
-                    demand.contains_key(&product_id)
-                };
 
+                let demand = d.try_read();
+                if let Err(_) = demand {
+                    continue;
+                }
+                let demand = demand.unwrap();
+                let is_already_demanded = demand.contains_key(&product_id);
+                drop(demand);
                 // 如果不在demand中，才添加
                 if !is_already_demanded {
-                    let mut demand = d.write().unwrap();
+                    let mut demand = d.try_write();
+                    if let Err(_) = demand{
+                        continue;
+                    }
+                    let mut demand = demand.unwrap();
                     demand.insert(product_id, true);
                 }
                 // 随机等待0~500ms
@@ -171,7 +182,11 @@ impl Agent {
     ) {
         // 根据1-preference.elastic的概率决定是否删除demand
         let mut rng = rand::thread_rng();
-
+        println!(
+            "handle trade failure checkpoint 1 agent_id:{} factory_id:{:?}",
+            self.id,
+            factory.id()
+        );
         let mut g = self.preferences.write().unwrap();
         if let Some(preference) = g.get_mut(&product_id) {
             // 计算概率：弹性值本身，弹性越大，越容易删除需求
@@ -296,28 +311,57 @@ impl Agent {
     }
 
     fn remove_demand(&mut self, product_id: u64, round: u64, reason: &str) {
-        let mut g = self.demand.write().unwrap();
-        g.remove(&product_id);
-
-        // 记录需求删除日志
-        let preferences = self.preferences.read().unwrap();
-        if let Some(preference) = preferences.get(&product_id) {
-            if let Err(e) = crate::logging::log_agent_demand_removal(
-                round,
-                self.id,
-                self.name.clone(),
-                product_id,
-                self.cash,
-                Some(preference.original_price),
-                Some(preference.original_elastic),
-                Some(preference.current_price),
-                Some(preference.current_range.0),
-                Some(preference.current_range.1),
-                reason,
-            ) {
-                eprintln!("Failed to log agent demand removal: {}", e);
-            }
-        }
+        // println!(
+        //     "remove_demand checkpoint 1 agent_id:{:?} product_id:{:?}",
+        //     self.id, product_id
+        // );
+        //
+        // let mut g = self.demand.write().unwrap();
+        // println!(
+        //     "remove_demand checkpoint 2 agent_id:{:?} product_id:{:?}",
+        //     self.id, product_id
+        // );
+        // g.remove(&product_id);
+        // println!(
+        //     "remove_demand checkpoint 3 agent_id:{:?} product_id:{:?}",
+        //     self.id, product_id
+        // );
+        // drop(g);
+        // println!(
+        //     "remove_demand checkpoint 4 agent_id:{:?} product_id:{:?}",
+        //     self.id, product_id
+        // );
+        // // 记录需求删除日志
+        // let preferences = self.preferences.read().unwrap();
+        // println!(
+        //     "remove_demand checkpoint 5 agent_id:{:?} product_id:{:?}",
+        //     self.id, product_id
+        // );
+        // if let Some(preference) = preferences.get(&product_id) {
+        //     println!(
+        //         "remove_demand checkpoint 6 agent_id:{:?} product_id:{:?}",
+        //         self.id, product_id
+        //     );
+        //     if let Err(e) = crate::logging::log_agent_demand_removal(
+        //         round,
+        //         self.id,
+        //         self.name.clone(),
+        //         product_id,
+        //         self.cash,
+        //         Some(preference.original_price),
+        //         Some(preference.original_elastic),
+        //         Some(preference.current_price),
+        //         Some(preference.current_range.0),
+        //         Some(preference.current_range.1),
+        //         reason,
+        //     ) {
+        //         println!("Failed to log agent demand removal: {}", e);
+        //     }
+        //     println!(
+        //         "remove_demand checkpoint 7 agent_id:{:?} product_id:{:?}",
+        //         self.id, product_id
+        //     );
+        // }
     }
 
     pub fn trade(
@@ -325,25 +369,69 @@ impl Agent {
         factory: &Factory,
         round: u64,
     ) -> (TradeResult, Option<IntervalRelation>) {
+        println!(
+            "start_trade agent_id:{:?} factory_id:{:?}",
+            self.id(),
+            factory.id()
+        );
         let has_demand = self.has_demand(factory.product_id());
         if !has_demand {
+            println!(
+                "return point 0 agent_id:{:?} factory_id:{:?}",
+                self.id(),
+                factory.id()
+            );
             return (TradeResult::NotMatched, None);
         }
+        println!(
+            "inner check point  1 agent_id:{:?} factory_id:{:?}",
+            self.id(),
+            factory.id()
+        );
         let interval_relation = self.match_factory(factory);
-
+        println!(
+            "inner check point  2 agent_id:{:?} factory_id:{:?}",
+            self.id(),
+            factory.id()
+        );
         let product_id = factory.product_id();
 
         match interval_relation {
             IntervalRelation::Overlapping(range) => {
                 let price = gen_price_in_range(range, self.cash);
+                println!(
+                    "inner check point 3 branch 1 agent_id:{:?} factory_id:{:?}",
+                    self.id(),
+                    factory.id()
+                );
                 if price.is_none() {
+                    println!(
+                        "return point 1 agent_id:{:?} factory_id:{:?}",
+                        self.id(),
+                        factory.id()
+                    );
                     self.handle_trade_failure(factory, product_id, round, false);
                     return (TradeResult::Failed, Some(interval_relation));
                 }
+                println!(
+                    "inner check point 3 branch 1.0 agent_id:{:?} factory_id:{:?}",
+                    self.id(),
+                    factory.id()
+                );
                 self.remove_demand(product_id, round, "successful_trade");
+                println!(
+                    "inner check point 3 branch 1.1 agent_id:{:?} factory_id:{:?}",
+                    self.id(),
+                    factory.id()
+                );
                 let price = price.unwrap();
                 self.cash -= price;
                 let mut g = self.preferences.write().unwrap();
+                println!(
+                    "inner check point 3 branch 1.2 agent_id:{:?} factory_id:{:?}",
+                    self.id(),
+                    factory.id()
+                );
                 let preference = g.get_mut(&product_id).unwrap();
                 preference.current_price = price;
                 let (new_min, new_max) =
@@ -390,16 +478,41 @@ impl Agent {
 
                     preference.current_range = (new_min, new_max);
                 }
+                println!(
+                    "return point 2 agent_id:{:?} factory_id:{:?}",
+                    self.id(),
+                    factory.id()
+                );
                 return (TradeResult::Success(price), Some(interval_relation));
             }
             IntervalRelation::AgentBelowFactory => {
+                println!(
+                    "inner check point 3 branch 2 agent_id:{:?} factory_id:{:?}",
+                    self.id(),
+                    factory.id()
+                );
                 // 代理价格低于工厂，商家售价太高，上移3%
                 self.handle_trade_failure(factory, product_id, round, true);
+                println!(
+                    "return point 3 agent_id:{:?} factory_id:{:?}",
+                    self.id(),
+                    factory.id()
+                );
                 return (TradeResult::Failed, Some(interval_relation));
             }
             IntervalRelation::AgentAboveFactory => {
+                println!(
+                    "inner check point 3 branch 3 agent_id:{:?} factory_id:{:?}",
+                    self.id(),
+                    factory.id()
+                );
                 // 代理价格高于工厂，商家售价太低，下移3%
                 self.handle_trade_failure(factory, product_id, round, false);
+                println!(
+                    "return point 4 agent_id:{:?} factory_id:{:?}",
+                    self.id(),
+                    factory.id()
+                );
                 return (TradeResult::Failed, Some(interval_relation));
             }
         }

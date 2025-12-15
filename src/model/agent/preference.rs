@@ -20,10 +20,12 @@ impl Preference {
     
     pub fn from_product(product: &Product) -> Self {
         // 使用产品的价格分布生成原始价格
-        let original_price = product.original_price_distribution().sample(Some((0.0,1000000.0)));
+        let original_price = product.original_price_distribution().sample(Some((0.01,1000000.0)));
         // 使用产品的弹性分布生成原始弹性，并限制在0~1之间
-        let original_elastic = product.original_elastic_distribution().sample(Some((0.0, 1.0)));
-        
+        let original_elastic = product.original_elastic_distribution().sample(Some((0.01, 1.0)));
+        if original_price == 0.0 {
+            panic!("original_price is 0.0");
+        }
         // 随机生成current_range，min随机(0.0到max*0.5)，max随机(min到max*1.5)
         let mut rng = rand::thread_rng();
         let base_max = original_price * 1.5;
