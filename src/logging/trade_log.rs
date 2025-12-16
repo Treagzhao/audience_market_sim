@@ -289,4 +289,165 @@ mod tests {
         assert_eq!(log.trade_result, "NotMatched".to_string());
         assert_eq!(log.price, None);
     }
+
+    #[test]
+    fn test_log_trade_with_success_result() {
+        // 测试log_trade函数，交易成功的情况
+        let round = 5;
+        let trade_id = 100;
+        let task_id = "test_task_567".to_string();
+        let interval_relation = "overlap";
+        let trade_result = TradeResult::Success(95.5);
+
+        // 创建测试用的Product
+        let product = Product::new(1, "TestProduct".to_string());
+        // 创建测试用的Agent，使用正确的参数
+        let agent = Arc::new(RwLock::new(Agent::new(1, "TestAgent".to_string(), 1000.0, &[product.clone()])));
+        // 创建测试用的Factory，使用正确的参数
+        let factory = Factory::new(1, "TestFactory".to_string(), &product);
+
+        let sql = log_trade(
+            round,
+            trade_id,
+            task_id.clone(),
+            agent.clone(),
+            &factory,
+            &product,
+            &trade_result,
+            interval_relation,
+        );
+
+        // 验证SQL包含正确的表名和字段
+        assert!(sql.contains("INSERT INTO trade_logs"));
+        assert!(sql.contains("timestamp"));
+        assert!(sql.contains("round"));
+        assert!(sql.contains("trade_id"));
+        assert!(sql.contains("task_id"));
+        assert!(sql.contains("agent_id"));
+        assert!(sql.contains("agent_name"));
+        assert!(sql.contains("agent_cash"));
+        assert!(sql.contains("factory_id"));
+        assert!(sql.contains("factory_name"));
+        assert!(sql.contains("product_id"));
+        assert!(sql.contains("product_name"));
+        assert!(sql.contains("trade_result"));
+        assert!(sql.contains("interval_relation"));
+        assert!(sql.contains("price"));
+
+        // 验证SQL包含正确的值
+        assert!(sql.contains(&round.to_string()));
+        assert!(sql.contains(&trade_id.to_string()));
+        assert!(sql.contains(&task_id));
+        assert!(sql.contains(&"TestAgent"));
+        assert!(sql.contains(&"TestFactory"));
+        assert!(sql.contains(&"TestProduct"));
+        assert!(sql.contains(&"Success"));
+        assert!(sql.contains(&"overlap"));
+        assert!(sql.contains(&"95.5"));
+    }
+
+    #[test]
+    fn test_log_trade_with_failed_result() {
+        // 测试log_trade函数，交易失败的情况
+        let round = 5;
+        let trade_id = 101;
+        let task_id = "test_task_567".to_string();
+        let interval_relation = "disjoint";
+        let trade_result = TradeResult::Failed;
+
+        // 创建测试用的Product
+        let product = Product::new(1, "TestProduct".to_string());
+        // 创建测试用的Agent，使用正确的参数
+        let agent = Arc::new(RwLock::new(Agent::new(1, "TestAgent".to_string(), 1000.0, &[product.clone()])));
+        // 创建测试用的Factory，使用正确的参数
+        let factory = Factory::new(1, "TestFactory".to_string(), &product);
+
+        let sql = log_trade(
+            round,
+            trade_id,
+            task_id.clone(),
+            agent.clone(),
+            &factory,
+            &product,
+            &trade_result,
+            interval_relation,
+        );
+
+        // 验证SQL包含正确的表名和字段
+        assert!(sql.contains("INSERT INTO trade_logs"));
+        assert!(sql.contains("trade_result"));
+        assert!(sql.contains("interval_relation"));
+        assert!(sql.contains("price"));
+
+        // 验证SQL包含正确的值
+        assert!(sql.contains(&"Failed"));
+        assert!(sql.contains(&"disjoint"));
+        assert!(sql.contains(&"-1")); // 验证失败情况下价格使用默认值-1
+    }
+
+    #[test]
+    fn test_log_trade_with_not_matched_result() {
+        // 测试log_trade函数，交易不匹配的情况
+        let round = 5;
+        let trade_id = 102;
+        let task_id = "test_task_567".to_string();
+        let interval_relation = "adjacent";
+        let trade_result = TradeResult::NotMatched;
+
+        // 创建测试用的Product
+        let product = Product::new(1, "TestProduct".to_string());
+        // 创建测试用的Agent，使用正确的参数
+        let agent = Arc::new(RwLock::new(Agent::new(1, "TestAgent".to_string(), 1000.0, &[product.clone()])));
+        // 创建测试用的Factory，使用正确的参数
+        let factory = Factory::new(1, "TestFactory".to_string(), &product);
+
+        let sql = log_trade(
+            round,
+            trade_id,
+            task_id.clone(),
+            agent.clone(),
+            &factory,
+            &product,
+            &trade_result,
+            interval_relation,
+        );
+
+        // 验证SQL包含正确的值
+        assert!(sql.contains(&"NotMatched"));
+        assert!(sql.contains(&"adjacent"));
+        assert!(sql.contains(&"-1")); // 验证不匹配情况下价格使用默认值-1
+    }
+
+    #[test]
+    fn test_log_trade_with_not_yet_result() {
+        // 测试log_trade函数，交易尚未进行的情况
+        let round = 5;
+        let trade_id = 103;
+        let task_id = "test_task_567".to_string();
+        let interval_relation = "unknown";
+        let trade_result = TradeResult::NotYet;
+
+        // 创建测试用的Product
+        let product = Product::new(1, "TestProduct".to_string());
+        // 创建测试用的Agent，使用正确的参数
+        let agent = Arc::new(RwLock::new(Agent::new(1, "TestAgent".to_string(), 1000.0, &[product.clone()])));
+        // 创建测试用的Factory，使用正确的参数
+        let factory = Factory::new(1, "TestFactory".to_string(), &product);
+
+        let sql = log_trade(
+            round,
+            trade_id,
+            task_id.clone(),
+            agent.clone(),
+            &factory,
+            &product,
+            &trade_result,
+            interval_relation,
+        );
+
+        // 验证SQL包含正确的值
+        assert!(sql.contains(&"NotYet"));
+        assert!(sql.contains(&"unknown"));
+        assert!(sql.contains(&"-1")); // 验证尚未进行情况下价格使用默认值-1
+    }
 }

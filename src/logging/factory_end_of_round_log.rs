@@ -225,4 +225,131 @@ mod tests {
         // 验证SQL使用了正确的引擎和字符集
         assert!(sql.contains("ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"));
     }
+
+    #[test]
+    fn test_log_factory_end_of_round() {
+        // 测试log_factory_end_of_round函数生成的SQL
+        let timestamp = 1609459200000; // 2021-01-01 00:00:00 UTC
+        let round = 25;
+        let task_id = "test_task_321".to_string();
+        let factory_id = 654;
+        let factory_name = "TestFactory".to_string();
+        let product_id = 303;
+        let cash = 2000.75;
+        let initial_stock = 100;
+        let remaining_stock = 30;
+        let supply_range_lower = 50.0;
+        let supply_range_upper = 150.0;
+
+        let sql = log_factory_end_of_round(
+            timestamp,
+            round,
+            task_id.clone(),
+            factory_id,
+            factory_name.clone(),
+            product_id,
+            cash,
+            initial_stock,
+            remaining_stock,
+            supply_range_lower,
+            supply_range_upper,
+        );
+
+        // 验证SQL包含正确的表名和字段
+        assert!(sql.contains("INSERT INTO factory_end_of_round_logs"));
+        assert!(sql.contains("timestamp"));
+        assert!(sql.contains("round"));
+        assert!(sql.contains("task_id"));
+        assert!(sql.contains("factory_id"));
+        assert!(sql.contains("factory_name"));
+        assert!(sql.contains("product_id"));
+        assert!(sql.contains("cash"));
+        assert!(sql.contains("initial_stock"));
+        assert!(sql.contains("remaining_stock"));
+        assert!(sql.contains("supply_range_lower"));
+        assert!(sql.contains("supply_range_upper"));
+
+        // 验证SQL包含正确的值
+        assert!(sql.contains(&timestamp.to_string()));
+        assert!(sql.contains(&round.to_string()));
+        assert!(sql.contains(&task_id));
+        assert!(sql.contains(&factory_id.to_string()));
+        assert!(sql.contains(&factory_name));
+        assert!(sql.contains(&product_id.to_string()));
+        assert!(sql.contains(&cash.to_string()));
+        assert!(sql.contains(&initial_stock.to_string()));
+        assert!(sql.contains(&remaining_stock.to_string()));
+        assert!(sql.contains(&supply_range_lower.to_string()));
+        assert!(sql.contains(&supply_range_upper.to_string()));
+    }
+
+    #[test]
+    fn test_log_factory_end_of_round_with_no_stock_change() {
+        // 测试库存没有变化的情况
+        let timestamp = 1609459200000;
+        let round = 25;
+        let task_id = "test_task_321".to_string();
+        let factory_id = 654;
+        let factory_name = "TestFactory".to_string();
+        let product_id = 303;
+        let cash = 2000.75;
+        let initial_stock = 100;
+        let remaining_stock = 100; // 库存没有变化
+        let supply_range_lower = 50.0;
+        let supply_range_upper = 150.0;
+
+        let sql = log_factory_end_of_round(
+            timestamp,
+            round,
+            task_id.clone(),
+            factory_id,
+            factory_name.clone(),
+            product_id,
+            cash,
+            initial_stock,
+            remaining_stock,
+            supply_range_lower,
+            supply_range_upper,
+        );
+
+        // 验证SQL生成正确
+        assert!(sql.contains("INSERT INTO factory_end_of_round_logs"));
+        assert!(sql.contains(&initial_stock.to_string()));
+        assert!(sql.contains(&remaining_stock.to_string()));
+    }
+
+    #[test]
+    fn test_log_factory_end_of_round_with_zero_stock() {
+        // 测试库存为0的情况
+        let timestamp = 1609459200000;
+        let round = 25;
+        let task_id = "test_task_321".to_string();
+        let factory_id = 654;
+        let factory_name = "TestFactory".to_string();
+        let product_id = 303;
+        let cash = 2000.75;
+        let initial_stock = 0;
+        let remaining_stock = 0;
+        let supply_range_lower = 50.0;
+        let supply_range_upper = 150.0;
+
+        let sql = log_factory_end_of_round(
+            timestamp,
+            round,
+            task_id.clone(),
+            factory_id,
+            factory_name.clone(),
+            product_id,
+            cash,
+            initial_stock,
+            remaining_stock,
+            supply_range_lower,
+            supply_range_upper,
+        );
+
+        // 验证SQL生成正确
+        assert!(sql.contains("INSERT INTO factory_end_of_round_logs"));
+        assert!(sql.contains(&initial_stock.to_string()));
+        assert!(sql.contains(&remaining_stock.to_string()));
+    }
 }
