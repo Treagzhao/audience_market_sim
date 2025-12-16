@@ -16,3 +16,4 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 csv = "1.3.0"
 rayon = "1.10.0"
 mysql = "26.0.1"
+parking_lot = { version = "0.12.5", features = ["deadlock_detection"] }
