@@ -1,15 +1,15 @@
-use crate::logging::{log_agent_cash, log_factory_end_of_round, log_trade};
 use crate::model::agent::{Agent, TradeResult};
 use crate::model::factory::Factory;
 use crate::model::product::Product;
+use parking_lot::RwLock;
 use rand::Rng;
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::RwLock;
 use std::thread;
 use std::thread::JoinHandle;
+use crate::logging::LOGGER;
 
 pub struct Market {
     factories: HashMap<u64, Arc<RwLock<Vec<Factory>>>>,
@@ -74,13 +74,13 @@ impl Market {
             let mut factories = self.factories.clone();
             // 打乱所有工厂的顺序
             for (_product_id, factory_list_arc) in factories.iter_mut() {
-                let mut factory_list = factory_list_arc.write().unwrap();
+                let mut factory_list = factory_list_arc.write();
                 factory_list.shuffle(&mut rng);
             }
 
             // 打乱所有消费者的顺序
             {
-                let mut agents = self.agents.write().unwrap();
+                let mut agents = self.agents.write();
                 agents.shuffle(&mut rng);
             }
 
@@ -101,7 +101,7 @@ impl Market {
                 let h = thread::spawn(move || {
                     println!("dealing product :{:?}", product_id);
                     let count = process_product_trades(products, f_list, agents, round, product_id);
-                    let mut c = counter.write().unwrap();
+                    let mut c = counter.write();
                     *c += count;
                 });
                 handles.push(h);
@@ -114,7 +114,7 @@ impl Market {
 
             // 汇总本轮交易数
             let current_round_trades = {
-                let r = round_trades.read().unwrap();
+                let r = round_trades.read();
                 *r
             };
             total_trades += current_round_trades;
@@ -134,10 +134,11 @@ impl Market {
                     .expect("Failed to get system time")
                     .as_millis() as i64;
 
-                let agents = self.agents.read().unwrap();
+                let agents = self.agents.read();
                 for agent in agents.iter() {
-                    let a = agent.read().unwrap();
-                    if let Err(e) = log_agent_cash(
+                    let a = agent.read();
+                    let mut logger = LOGGER.write();
+                    if let Err(e) = logger.log_agent_cash(
                         timestamp,
                         round,
                         a.id(),
@@ -151,7 +152,7 @@ impl Market {
 
                 // 记录每个工厂的轮次结束日志，使用与agent现金日志相同的timestamp
                 for (_product_id, factory_list_arc) in self.factories.iter() {
-                    let factory_list = factory_list_arc.read().unwrap();
+                    let factory_list = factory_list_arc.read();
                     for factory in factory_list.iter() {
                         let product_id = factory.product_id();
                         let (supply_range_lower, supply_range_upper) = factory.supply_price_range();
@@ -159,7 +160,8 @@ impl Market {
                         let initial_stock = factory.get_initial_stock();
                         // 获取本轮结束时的剩余库存（经过交易后的库存）
                         let remaining_stock = factory.get_stock(round);
-                        if let Err(e) = log_factory_end_of_round(
+                        let mut logger = LOGGER.write();
+                        if let Err(e) = logger.log_factory_end_of_round(
                             timestamp,
                             round,
                             factory.id(),
@@ -179,9 +181,9 @@ impl Market {
 
             // 检查是否所有agent的余额为0
             let all_agents_broke = {
-                let agents = self.agents.write().unwrap();
+                let agents = self.agents.write();
                 agents.iter().all(|agent| {
-                    let mut a = agent.write().unwrap();
+                    let mut a = agent.write();
                     a.income((50.0, 100.0));
                     a.cash() < 0.01
                 })
@@ -228,7 +230,7 @@ fn process_product_trades(
     let product = p.unwrap();
     // 查找产品
     // 获取工厂列表的Arc副本
-    let mut factory_list_arc = factories.write().unwrap();
+    let mut factory_list_arc = factories.write();
     // 克隆Arc，以便在闭包中使用
     let factory_list_arc_clone = factory_list_arc;
     let agents_clone = agents.clone();
@@ -247,12 +249,12 @@ fn process_product_trades(
             factory.start_round(round);
 
             // 获取agents的可变锁
-            let mut agents = agents_clone.read().unwrap();
+            let mut agents = agents_clone.read();
             //println!("current dealing product :{:?} factory_id:{:?}",product_id,factory.id());
             // 让每个agent与工厂进行交易
             for a in agents.iter() {
                 let agent_id = {
-                    let agent = a.read().unwrap();
+                    let agent = a.read();
                     agent.id()
                 };
                 println!(
@@ -265,28 +267,68 @@ fn process_product_trades(
                 if factory.get_stock(round) <= 0 {
                     break;
                 }
-                println!("checkpoint 1 for product:{:?} factory_id:{:?} agent_id:{:?}",product_id,factory.id(),agent_id);
+                println!(
+                    "checkpoint 1 for product:{:?} factory_id:{:?} agent_id:{:?}",
+                    product_id,
+                    factory.id(),
+                    agent_id
+                );
                 let has_demand = {
-                    let agent = a.read().unwrap();
+                    let agent = a.read();
                     agent.has_demand(product_id)
                 };
-                println!("checkpoint 2 for product:{:?} factory_id:{:?} agent_id:{:?}",product_id,factory.id(),agent_id);
+                println!(
+                    "checkpoint 2 for product:{:?} factory_id:{:?} agent_id:{:?}",
+                    product_id,
+                    factory.id(),
+                    agent_id
+                );
                 let mut trade_result = TradeResult::NotYet;
                 let mut interval_relation = None;
-                println!("checkpoint 3 for product:{:?} factory_id:{:?} agent_id:{:?}",product_id,factory.id(),agent_id);
+                println!(
+                    "checkpoint 3 for product:{:?} factory_id:{:?} agent_id:{:?}",
+                    product_id,
+                    factory.id(),
+                    agent_id
+                );
                 if !has_demand {
                     trade_result = TradeResult::NotMatched;
                 } else {
-                    println!("else branch for product :{:?} factory_id:{:?} agent_id:{:?}",product_id,factory.id(),agent_id);
-                    let mut agent = a.write().unwrap();
-                    println!("get mutex for product :{:?} factory_id:{:?} agent_id:{:?}",product_id,factory.id(),agent_id);
+                    println!(
+                        "else branch for product :{:?} factory_id:{:?} agent_id:{:?}",
+                        product_id,
+                        factory.id(),
+                        agent_id
+                    );
+                    let mut agent = a.write();
+                    println!(
+                        "get mutex for product :{:?} factory_id:{:?} agent_id:{:?}",
+                        product_id,
+                        factory.id(),
+                        agent_id
+                    );
                     // 调用agent的trade方法
                     (trade_result, interval_relation) = agent.trade(factory, round);
-                    println!("agent trade after for product :{:?} factory_id:{:?} agent_id:{:?}",product_id,factory.id(),agent_id);
+                    println!(
+                        "agent trade after for product :{:?} factory_id:{:?} agent_id:{:?}",
+                        product_id,
+                        factory.id(),
+                        agent_id
+                    );
                     drop(agent);
-                    println!("drop mutex for product :{:?} factory_id:{:?} agent_id:{:?}",product_id,factory.id(),agent_id);
+                    println!(
+                        "drop mutex for product :{:?} factory_id:{:?} agent_id:{:?}",
+                        product_id,
+                        factory.id(),
+                        agent_id
+                    );
                 }
-                println!("checkpoint 4 for product:{:?} factory_id:{:?} agent_id:{:?}",product_id,factory.id(),agent_id);
+                println!(
+                    "checkpoint 4 for product:{:?} factory_id:{:?} agent_id:{:?}",
+                    product_id,
+                    factory.id(),
+                    agent_id
+                );
                 // 将interval_relation转换为字符串
                 let interval_relation_str = match &interval_relation {
                     Some(rel) => match rel {
@@ -308,15 +350,16 @@ fn process_product_trades(
                 if matches!(trade_result, crate::model::agent::TradeResult::Success(_)) {
                     local_count += 1;
                 }
-
                 // 记录交易日志
-                if let Err(e) = log_trade(
+                let mut logger = LOGGER.write();
+                if let Err(e) = logger.log_trade(
                     round,
                     a.clone(),
                     factory,
                     &product_clone,
                     &trade_result,
                     interval_relation_str,
+                    0
                 ) {
                     eprintln!("Failed to log trade: {}", e);
                 }

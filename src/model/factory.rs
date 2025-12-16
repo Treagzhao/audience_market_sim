@@ -1,4 +1,4 @@
-use crate::logging::log_factory_range_optimization;
+use crate::logging::{log_factory_range_optimization, LOGGER};
 use crate::model::agent::{IntervalRelation, TradeResult};
 use crate::model::product::Product;
 use crate::model::util::shift_range_by_ratio;
@@ -148,7 +148,8 @@ impl Factory {
                     upper_change,
                 ) = get_range_change_info((lower, upper), (new_lower, new_upper));
                 // 调用日志记录函数
-                if let Err(e) = log_factory_range_optimization(
+                let mut logger = LOGGER.write();
+                if let Err(e) = logger.log_factory_range_optimization(
                     round,
                     self.id(),
                     self.name().to_string(),
@@ -180,9 +181,9 @@ impl Factory {
                     upper_change,
                 ) = get_range_change_info((lower, upper), (new_lower, new_upper));
                 // 调用日志记录函数
-
+                let mut logger = LOGGER.write();
                 // 调用日志记录函数
-                if let Err(e) = log_factory_range_optimization(
+                if let Err(e) = logger.log_factory_range_optimization(
                     round,
                     self.id(),
                     self.name().to_string(),

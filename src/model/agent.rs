@@ -1,4 +1,3 @@
-use crate::logging::log_agent_range_adjustment;
 use crate::model::agent::preference::Preference;
 use crate::model::factory::Factory;
 use crate::model::product::Product;
@@ -7,12 +6,14 @@ use crate::model::util::{
 };
 use log::debug;
 use mysql::prelude::{TextQuery, WithParams};
+use parking_lot::RwLock;
 use rand::Rng;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
+use crate::logging::LOGGER;
 
 mod preference;
 
@@ -22,6 +23,7 @@ pub struct Agent {
     preferences: Arc<RwLock<HashMap<u64, Preference>>>,
     cash: f64,
     demand: Arc<RwLock<HashMap<u64, bool>>>,
+
 }
 
 /// 区间关系枚举，表示两个区间之间的关系
@@ -75,8 +77,8 @@ impl Agent {
         &self.name
     }
 
-    pub fn preferences(&self) -> std::sync::RwLockReadGuard<'_, HashMap<u64, Preference>> {
-        self.preferences.read().unwrap()
+    pub fn preferences(&self) -> parking_lot::RwLockReadGuard<'_, HashMap<u64, Preference>> {
+        self.preferences.read()
     }
 
     pub fn cash(&self) -> f64 {
@@ -99,12 +101,10 @@ impl Agent {
             loop {
                 // 从preferences中随机选择一个商品ID
 
-                let preferences = p.try_read();
-                if let Err(_) = preferences {
+                let Some(preferences) = p.try_read() else {
                     // 如果无法获取preferences的读锁，跳过本次循环
                     continue;
-                }
-                let preferences = preferences.unwrap();
+                };
                 if preferences.is_empty() {
                     continue; // 如果preferences为空，跳过本次循环
                 }
@@ -115,20 +115,16 @@ impl Agent {
                 drop(preferences);
                 // 检查该商品是否已经在demand中
 
-                let demand = d.try_read();
-                if let Err(_) = demand {
+                let Some(demand) = d.try_read() else {
                     continue;
-                }
-                let demand = demand.unwrap();
+                };
                 let is_already_demanded = demand.contains_key(&product_id);
                 drop(demand);
                 // 如果不在demand中，才添加
                 if !is_already_demanded {
-                    let mut demand = d.try_write();
-                    if let Err(_) = demand{
+                    let Some(mut demand) = d.try_write() else {
                         continue;
-                    }
-                    let mut demand = demand.unwrap();
+                    };
                     demand.insert(product_id, true);
                 }
                 // 随机等待0~500ms
@@ -139,14 +135,14 @@ impl Agent {
     }
 
     pub fn has_demand(&self, product_id: u64) -> bool {
-        let demand = self.demand.read().unwrap();
+        let demand = self.demand.read();
         demand.contains_key(&product_id)
     }
 
     fn match_factory(&self, factory: &Factory) -> IntervalRelation {
         let product_id = factory.product_id();
 
-        let pg = self.preferences.read().unwrap();
+        let pg = self.preferences.read();
         let p = pg.get(&product_id).unwrap();
 
         let agent_range = p.current_range;
@@ -187,7 +183,7 @@ impl Agent {
             self.id,
             factory.id()
         );
-        let mut g = self.preferences.write().unwrap();
+        let mut g = self.preferences.write();
         println!(
             "handle trade failure checkpoint 2 agent_id:{} factory_id:{:?}",
             self.id,
@@ -206,7 +202,9 @@ impl Agent {
 
             if random_value < delete_probability {
                 // 删除demand
-                if let Ok(mut demand) = self.demand.write() {
+                {
+                    // 新增作用域括号
+                    let mut demand = self.demand.write();
                     println!(
                         "handle trade failure checkpoint 5 agent_id:{} factory_id:{:?}",
                         self.id,
@@ -216,7 +214,8 @@ impl Agent {
 
                     // 记录需求删除日志
                     let preference = g.get(&product_id).unwrap();
-                    if let Err(e) = crate::logging::log_agent_demand_removal(
+                    let logger = LOGGER.write();
+                    if let Err(e) = logger.log_agent_demand_removal(
                         round,
                         self.id,
                         self.name.clone(),
@@ -231,8 +230,9 @@ impl Agent {
                     ) {
                         eprintln!("Failed to log agent demand removal: {}", e);
                     }
-                }
+                } // 关闭作用域括号
             } else {
+                let preference = g.get_mut(&product_id).unwrap();
                 // 不删除demand，更新range
                 let (old_min, old_max) = preference.current_range;
                 let old_length = old_max - old_min;
@@ -298,9 +298,9 @@ impl Agent {
                     let old_center = (old_min + old_max) / 2.0;
                     let new_center = (new_min + new_max) / 2.0;
                     let rounded_new_center = round_to_nearest_cent(new_center);
-
+                    let mut logger = LOGGER.write();
                     // 调用日志记录函数
-                    if let Err(e) = log_agent_range_adjustment(
+                    if let Err(e) = logger.log_agent_range_adjustment(
                         round, // 使用传入的round参数
                         self.id,
                         self.name.clone(),
@@ -440,7 +440,7 @@ impl Agent {
                 );
                 let price = price.unwrap();
                 self.cash -= price;
-                let mut g = self.preferences.write().unwrap();
+                let mut g = self.preferences.write();
                 println!(
                     "inner check point 3 branch 1.2 agent_id:{:?} factory_id:{:?}",
                     self.id(),
@@ -475,8 +475,9 @@ impl Agent {
                         self.id(),
                         factory.id()
                     );
+                    let mut logger = LOGGER.write();
                     // 调用日志记录函数
-                    if let Err(e) = log_agent_range_adjustment(
+                    if let Err(e) = logger.log_agent_range_adjustment(
                         round, // 使用传入的round参数
                         self.id(),
                         self.name().to_string(),
@@ -641,7 +642,7 @@ mod tests {
         thread::sleep(Duration::from_secs(1));
 
         // 检查demand映射是否有内容
-        let demand = agent.demand.read().unwrap();
+        let demand = agent.demand.read();
         assert!(
             demand.len() > 0,
             "Demand map should not be empty after calling desire"
@@ -649,7 +650,7 @@ mod tests {
 
         // 获取preferences中的商品ID集合
         let valid_product_ids: std::collections::HashSet<u64> = {
-            let preferences = agent.preferences.read().unwrap();
+            let preferences = agent.preferences.read();
             preferences.keys().cloned().collect()
         };
 
@@ -704,13 +705,13 @@ mod tests {
         let initial_range = (40.0, 60.0);
 
         {
-            let mut preferences = agent.preferences.write().unwrap();
+            let mut preferences = agent.preferences.write();
             let preference = preferences.get_mut(&product_id).unwrap();
             preference.current_range = initial_range;
         }
 
         {
-            let mut demand = agent.demand.write().unwrap();
+            let mut demand = agent.demand.write();
             demand.insert(product_id, true);
         }
 
@@ -725,7 +726,7 @@ mod tests {
 
         // 获取Agent的range，使用独立的代码块确保借用及时释放
         let agent_range = {
-            let preferences = agent.preferences.read().unwrap();
+            let preferences = agent.preferences.read();
             preferences.get(&product_id).unwrap().current_range
         };
 
@@ -737,7 +738,7 @@ mod tests {
 
         // 如果没有交集，调整Agent的range，确保有交集
         if overlap_max <= overlap_min {
-            let mut preferences = agent.preferences.write().unwrap();
+            let mut preferences = agent.preferences.write();
             let preference = preferences.get_mut(&product_id).unwrap();
             // 设置一个与factory_range有交集的range
             preference.current_range = (factory_min, factory_max + 10.0);
@@ -748,7 +749,7 @@ mod tests {
 
         // 获取初始范围
         let initial_range = {
-            let preferences_before = agent.preferences.read().unwrap();
+            let preferences_before = agent.preferences.read();
             let preference_before = preferences_before.get(&product_id).unwrap();
             preference_before.current_range
         };
@@ -761,7 +762,7 @@ mod tests {
             TradeResult::Success(_price) => {
                 // 验证需求被移除
                 {
-                    let demand = agent.demand.read().unwrap();
+                    let demand = agent.demand.read();
                     assert!(
                         !demand.contains_key(&product_id),
                         "Demand should be removed after successful trade"
@@ -769,7 +770,7 @@ mod tests {
                 }
 
                 // 验证current_price和current_range更新
-                let preferences = agent.preferences.read().unwrap();
+                let preferences = agent.preferences.read();
                 let preference = preferences.get(&product_id).unwrap();
 
                 // 验证cash减少
@@ -863,13 +864,13 @@ mod tests {
             let initial_range = (40.0, 100.0);
 
             {
-                let mut preferences = agent.preferences.write().unwrap();
+                let mut preferences = agent.preferences.write();
                 let preference = preferences.get_mut(&product_id).unwrap();
                 preference.current_range = initial_range;
             }
 
             {
-                let mut demand = agent.demand.write().unwrap();
+                let mut demand = agent.demand.write();
                 demand.insert(product_id, true);
             }
 
@@ -885,7 +886,7 @@ mod tests {
             if let TradeResult::Success(_price) = result {
                 if agent.cash() == 0.0 {
                     // 验证需求被移除
-                    let demand = agent.demand.read().unwrap();
+                    let demand = agent.demand.read();
                     if !demand.contains_key(&product_id) {
                         success = true;
                         break;
@@ -943,13 +944,13 @@ mod tests {
         let initial_range = (40.0, 60.0);
 
         {
-            let mut preferences = agent.preferences.write().unwrap();
+            let mut preferences = agent.preferences.write();
             let preference = preferences.get_mut(&product_id).unwrap();
             preference.current_range = initial_range;
         }
 
         {
-            let mut demand = agent.demand.write().unwrap();
+            let mut demand = agent.demand.write();
             demand.insert(product_id, true);
         }
 
@@ -961,7 +962,7 @@ mod tests {
         // 记录交易前的状态
         let initial_cash = agent.cash();
         let initial_range = {
-            let preferences_before = agent.preferences.read().unwrap();
+            let preferences_before = agent.preferences.read();
             preferences_before.get(&product_id).unwrap().current_range
         };
 
@@ -982,7 +983,7 @@ mod tests {
         );
 
         // 验证range可能被更新（取决于随机概率）
-        let preferences = agent.preferences.read().unwrap();
+        let preferences = agent.preferences.read();
         let preference = preferences.get(&product_id).unwrap();
         let new_range = preference.current_range;
 
@@ -1028,7 +1029,7 @@ mod tests {
 
         // 添加需求
         {
-            let mut demand = agent.demand.write().unwrap();
+            let mut demand = agent.demand.write();
             demand.insert(product_id, true);
         }
 
@@ -1076,7 +1077,7 @@ mod tests {
 
         // 清除所有需求，确保没有需求
         {
-            let mut demand = agent.demand.write().unwrap();
+            let mut demand = agent.demand.write();
             demand.clear();
         }
 
@@ -1124,7 +1125,7 @@ mod tests {
 
         // 添加需求
         {
-            let mut demand = agent.demand.write().unwrap();
+            let mut demand = agent.demand.write();
             demand.insert(product_id, true);
         }
 
@@ -1182,7 +1183,7 @@ mod tests {
 
         // 确保没有需求
         {
-            let mut demand = agent.demand.write().unwrap();
+            let mut demand = agent.demand.write();
             demand.clear();
         }
 
