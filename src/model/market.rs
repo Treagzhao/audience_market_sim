@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::{SystemTime, UNIX_EPOCH};
 use crate::logging::LOGGER;
 
 pub struct Market {
@@ -71,6 +72,10 @@ impl Market {
 
         loop {
             println!("Starting round {}, Total trades: {}", round, total_trades);
+            let current_timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_millis() as i64;
             let mut factories = self.factories.clone();
             // 打乱所有工厂的顺序
             for (_product_id, factory_list_arc) in factories.iter_mut() {
@@ -100,7 +105,7 @@ impl Market {
                 let mut counter = round_trades.clone();
                 let h = thread::spawn(move || {
                     println!("dealing product :{:?}", product_id);
-                    let count = process_product_trades(products, f_list, agents, round, product_id);
+                    let count = process_product_trades(current_timestamp,products, f_list, agents, round, product_id);
                     let mut c = counter.write();
                     *c += count;
                 });
@@ -215,6 +220,7 @@ impl Market {
 
 /// 处理单个商品的交易逻辑（线程安全版本）
 fn process_product_trades(
+    timestamp:i64,
     products: Vec<Product>,
     factories: Arc<RwLock<Vec<Factory>>>,
     agents: Arc<RwLock<Vec<Arc<RwLock<Agent>>>>>,
@@ -253,16 +259,11 @@ fn process_product_trades(
             //println!("current dealing product :{:?} factory_id:{:?}",product_id,factory.id());
             // 让每个agent与工厂进行交易
             for a in agents.iter() {
-                let agent_id = {
+                let (agent_id, agent_name) = {
                     let agent = a.read();
-                    agent.id()
+                    (agent.id(), agent.name().to_string())
                 };
-                println!(
-                    "current dealing product :{:?} factory_id:{:?} agent_id:{:?}",
-                    product_id,
-                    factory.id(),
-                    agent_id
-                );
+
                 // 检查工厂库存，如果为0则退出循环
                 if factory.get_stock(round) <= 0 {
                     break;
@@ -350,16 +351,34 @@ fn process_product_trades(
                 if matches!(trade_result, crate::model::agent::TradeResult::Success(_)) {
                     local_count += 1;
                 }
+                let (agent_cash,agent_pref_original_price,agent_pref_original_elastic,agent_pref_current_price,agent_pref_current_range_lower,agent_pref_current_range_upper) = {
+                    let agent = a.read();
+                    let g = agent.preferences();
+                    let preferences = g.get(&product_id);
+                    if let Some(x) = preferences {
+                        (agent.cash(),x.original_price,x.original_elastic,x.current_price,x.current_range.0,x.current_range.1)
+                    } else {
+                        (agent.cash(),0.0,0.0,0.0,0.0,0.0)
+                    }
+                };
                 // 记录交易日志
                 let mut logger = LOGGER.write();
                 if let Err(e) = logger.log_trade(
+                    timestamp,
                     round,
-                    a.clone(),
+                    0,
+                    agent_id,
+                    agent_name,
+                    agent_cash,
+                    agent_pref_original_price,
+                    agent_pref_original_elastic,
+                    agent_pref_current_price,
+                    agent_pref_current_range_lower,
+                    agent_pref_current_range_upper,
                     factory,
-                    &product_clone,
+                    product,
                     &trade_result,
                     interval_relation_str,
-                    0
                 ) {
                     eprintln!("Failed to log trade: {}", e);
                 }

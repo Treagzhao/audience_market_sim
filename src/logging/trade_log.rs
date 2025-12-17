@@ -21,23 +21,31 @@ pub struct TradeLog {
     pub product_name: String,
     pub trade_result: String,
     pub interval_relation: String,
-    pub price: Option<f64>,
+    pub price: f64,
     pub factory_supply_range_lower: f64,
     pub factory_supply_range_upper: f64,
     pub factory_stock: i16,
-    pub agent_pref_original_price: Option<f64>,
-    pub agent_pref_original_elastic: Option<f64>,
-    pub agent_pref_current_price: Option<f64>,
-    pub agent_pref_current_range_lower: Option<f64>,
-    pub agent_pref_current_range_upper: Option<f64>,
+    pub agent_pref_original_price: f64,
+    pub agent_pref_original_elastic: f64,
+    pub agent_pref_current_price: f64,
+    pub agent_pref_current_range_lower: f64,
+    pub agent_pref_current_range_upper: f64,
 }
 
 impl TradeLog {
     pub fn new(
+        timestamp:i64,
         round: u64,
         trade_id: u64,
         task_id: String,
-        a: Arc<RwLock<Agent>>,
+        agent_id: u64,
+        agent_name: String,
+        agent_cash: f64,
+        agent_pref_original_price:f64,
+        agent_pref_original_elastic:f64,
+        agent_pref_current_price:f64,
+        agent_pref_current_range_lower:f64,
+        agent_pref_current_range_upper:f64,
         factory: &Factory,
         product: &Product,
         trade_result: &TradeResult,
@@ -51,47 +59,22 @@ impl TradeLog {
         };
 
         let (lower, upper) = factory.supply_price_range();
-        let agent = a.read();
-        let preferences = agent.preferences();
-        let preference = preferences.get(&product.id());
-
-        let (
-            agent_pref_original_price,
-            agent_pref_original_elastic,
-            agent_pref_current_price,
-            agent_pref_current_range_lower,
-            agent_pref_current_range_upper,
-        ) = match preference {
-            Some(pref) => (
-                Some(pref.original_price),
-                Some(pref.original_elastic),
-                Some(pref.current_price),
-                Some(pref.current_range.0),
-                Some(pref.current_range.1),
-            ),
-            None => (None, None, None, None, None),
-        };
-
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Failed to get system time")
-            .as_millis() as i64;
 
         TradeLog {
             timestamp,
             round,
             trade_id,
             task_id,
-            agent_id: agent.id(),
-            agent_name: agent.name().to_string(),
-            agent_cash: agent.cash(),
+            agent_id,
+            agent_name,
+            agent_cash,
             factory_id: factory.id(),
             factory_name: factory.name().to_string(),
             product_id: product.id(),
             product_name: product.name().to_string(),
             trade_result: result_str.to_string(),
             interval_relation: interval_relation.to_string(),
-            price,
+            price:price.unwrap_or(-1.0),
             factory_supply_range_lower: lower,
             factory_supply_range_upper: upper,
             factory_stock: factory.get_stock(round),
@@ -105,20 +88,36 @@ impl TradeLog {
 }
 
 pub fn log_trade(
+    timestamp:i64,
     round: u64,
     trade_id: u64,
     task_id: String,
-    a: Arc<RwLock<Agent>>,
+    agent_id: u64,
+    agent_name: String,
+    agent_cash: f64,
+    agent_pref_original_price:f64,
+    agent_pref_original_elastic:f64,
+    agent_pref_current_price:f64,
+    agent_pref_current_range_lower:f64,
+    agent_pref_current_range_upper:f64,
     factory: &Factory,
     product: &Product,
     trade_result: &TradeResult,
     interval_relation: &str,
 ) -> String {
     let log = TradeLog::new(
+        timestamp,
         round,
         trade_id,
-        task_id.clone(),
-        a,
+        task_id,
+        agent_id,
+        agent_name,
+        agent_cash,
+        agent_pref_original_price,
+        agent_pref_original_elastic,
+        agent_pref_current_price,
+        agent_pref_current_range_lower,
+        agent_pref_current_range_upper,
         factory,
         product,
         trade_result,
@@ -155,15 +154,15 @@ pub fn log_trade(
         log.product_name,
         log.trade_result,
         log.interval_relation,
-        log.price.unwrap_or(-1.0),
+        log.price,
         log.factory_supply_range_lower,
         log.factory_supply_range_upper,
         log.factory_stock,
-        log.agent_pref_original_price.unwrap_or(-1.0),
-        log.agent_pref_original_elastic.unwrap_or(-1.0),
-        log.agent_pref_current_price.unwrap_or(-1.0),
-        log.agent_pref_current_range_lower.unwrap_or(-1.0),
-        log.agent_pref_current_range_upper.unwrap_or(-1.0),
+        log.agent_pref_original_price,
+        log.agent_pref_original_elastic,
+        log.agent_pref_current_price,
+        log.agent_pref_current_range_lower,
+        log.agent_pref_current_range_upper,
     );
     sql
 }
@@ -195,6 +194,7 @@ mod tests {
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
         let log = TradeLog::new(
+
             round,
             trade_id,
             task_id.clone(),
