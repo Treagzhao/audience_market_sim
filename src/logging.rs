@@ -223,7 +223,7 @@ impl Logger {
         cash: f64,
         total_trades: u64,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let sql = log_agent_cash(timestamp, round, agent_id, agent_name, cash, total_trades);
+        let sql = log_agent_cash(timestamp, self.task_id.clone(), round, agent_id, agent_name, cash, total_trades);
         self.tx.send(sql)?;
         Ok(())
     }

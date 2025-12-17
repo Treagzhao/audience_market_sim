@@ -341,11 +341,6 @@ impl Agent {
         factory: &Factory,
         round: u64,
     ) -> (TradeResult, Option<IntervalRelation>) {
-        println!(
-            "start_trade agent_id:{:?} factory_id:{:?}",
-            self.id(),
-            factory.id()
-        );
         let has_demand = self.has_demand(factory.product_id());
         if !has_demand {
             return (TradeResult::NotMatched, None);
