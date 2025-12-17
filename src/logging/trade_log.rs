@@ -180,6 +180,10 @@ mod tests {
     #[test]
     fn test_trade_log_new_with_success_result() {
         // 测试TradeLog::new方法，交易成功的情况
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get system time")
+            .as_millis() as i64;
         let round = 5;
         let trade_id = 100;
         let task_id = "test_task_567".to_string();
@@ -188,29 +192,30 @@ mod tests {
 
         // 创建测试用的Product
         let product = Product::new(1, "TestProduct".to_string());
-        // 创建测试用的Agent，使用正确的参数
-        let agent = Arc::new(RwLock::new(Agent::new(1, "TestAgent".to_string(), 1000.0, &[product.clone()])));
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
         let log = TradeLog::new(
-
+            timestamp,
             round,
             trade_id,
             task_id.clone(),
-            agent.clone(),
+            1, // agent_id
+            "TestAgent".to_string(), // agent_name
+            1000.0, // agent_cash
+            100.0, // agent_pref_original_price
+            0.5, // agent_pref_original_elastic
+            98.0, // agent_pref_current_price
+            90.0, // agent_pref_current_range_lower
+            110.0, // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
             interval_relation,
         );
 
-        // 验证时间戳是否为当前时间附近（允许1秒误差）
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Failed to get system time")
-            .as_millis() as i64;
-        assert!(log.timestamp >= current_time - 1000 && log.timestamp <= current_time + 1000);
+        // 验证时间戳是否为我们传入的时间
+        assert_eq!(log.timestamp, timestamp);
 
         // 验证其他字段
         assert_eq!(log.round, round);
@@ -224,12 +229,16 @@ mod tests {
         assert_eq!(log.product_name, "TestProduct".to_string());
         assert_eq!(log.trade_result, "Success".to_string());
         assert_eq!(log.interval_relation, interval_relation.to_string());
-        assert_eq!(log.price, Some(95.5));
+        assert_eq!(log.price, 95.5);
     }
 
     #[test]
     fn test_trade_log_new_with_failed_result() {
         // 测试TradeLog::new方法，交易失败的情况
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get system time")
+            .as_millis() as i64;
         let round = 5;
         let trade_id = 101;
         let task_id = "test_task_567".to_string();
@@ -238,16 +247,22 @@ mod tests {
 
         // 创建测试用的Product
         let product = Product::new(1, "TestProduct".to_string());
-        // 创建测试用的Agent，使用正确的参数
-        let agent = Arc::new(RwLock::new(Agent::new(1, "TestAgent".to_string(), 1000.0, &[product.clone()])));
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
         let log = TradeLog::new(
+            timestamp,
             round,
             trade_id,
             task_id.clone(),
-            agent.clone(),
+            1, // agent_id
+            "TestAgent".to_string(), // agent_name
+            1000.0, // agent_cash
+            100.0, // agent_pref_original_price
+            0.5, // agent_pref_original_elastic
+            98.0, // agent_pref_current_price
+            90.0, // agent_pref_current_range_lower
+            110.0, // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
@@ -255,13 +270,17 @@ mod tests {
         );
 
         assert_eq!(log.trade_result, "Failed".to_string());
-        assert_eq!(log.price, None);
+        assert_eq!(log.price, -1.0);
         assert_eq!(log.interval_relation, interval_relation.to_string());
     }
 
     #[test]
     fn test_trade_log_new_with_not_matched_result() {
         // 测试TradeLog::new方法，交易不匹配的情况
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get system time")
+            .as_millis() as i64;
         let round = 5;
         let trade_id = 102;
         let task_id = "test_task_567".to_string();
@@ -270,16 +289,22 @@ mod tests {
 
         // 创建测试用的Product
         let product = Product::new(1, "TestProduct".to_string());
-        // 创建测试用的Agent，使用正确的参数
-        let agent = Arc::new(RwLock::new(Agent::new(1, "TestAgent".to_string(), 1000.0, &[product.clone()])));
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
         let log = TradeLog::new(
+            timestamp,
             round,
             trade_id,
             task_id.clone(),
-            agent.clone(),
+            1, // agent_id
+            "TestAgent".to_string(), // agent_name
+            1000.0, // agent_cash
+            100.0, // agent_pref_original_price
+            0.5, // agent_pref_original_elastic
+            98.0, // agent_pref_current_price
+            90.0, // agent_pref_current_range_lower
+            110.0, // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
@@ -287,12 +312,16 @@ mod tests {
         );
 
         assert_eq!(log.trade_result, "NotMatched".to_string());
-        assert_eq!(log.price, None);
+        assert_eq!(log.price, -1.0);
     }
 
     #[test]
     fn test_log_trade_with_success_result() {
         // 测试log_trade函数，交易成功的情况
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get system time")
+            .as_millis() as i64;
         let round = 5;
         let trade_id = 100;
         let task_id = "test_task_567".to_string();
@@ -301,16 +330,22 @@ mod tests {
 
         // 创建测试用的Product
         let product = Product::new(1, "TestProduct".to_string());
-        // 创建测试用的Agent，使用正确的参数
-        let agent = Arc::new(RwLock::new(Agent::new(1, "TestAgent".to_string(), 1000.0, &[product.clone()])));
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
         let sql = log_trade(
+            timestamp,
             round,
             trade_id,
             task_id.clone(),
-            agent.clone(),
+            1, // agent_id
+            "TestAgent".to_string(), // agent_name
+            1000.0, // agent_cash
+            100.0, // agent_pref_original_price
+            0.5, // agent_pref_original_elastic
+            98.0, // agent_pref_current_price
+            90.0, // agent_pref_current_range_lower
+            110.0, // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
@@ -349,6 +384,10 @@ mod tests {
     #[test]
     fn test_log_trade_with_failed_result() {
         // 测试log_trade函数，交易失败的情况
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get system time")
+            .as_millis() as i64;
         let round = 5;
         let trade_id = 101;
         let task_id = "test_task_567".to_string();
@@ -357,16 +396,22 @@ mod tests {
 
         // 创建测试用的Product
         let product = Product::new(1, "TestProduct".to_string());
-        // 创建测试用的Agent，使用正确的参数
-        let agent = Arc::new(RwLock::new(Agent::new(1, "TestAgent".to_string(), 1000.0, &[product.clone()])));
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
         let sql = log_trade(
+            timestamp,
             round,
             trade_id,
             task_id.clone(),
-            agent.clone(),
+            1, // agent_id
+            "TestAgent".to_string(), // agent_name
+            1000.0, // agent_cash
+            100.0, // agent_pref_original_price
+            0.5, // agent_pref_original_elastic
+            98.0, // agent_pref_current_price
+            90.0, // agent_pref_current_range_lower
+            110.0, // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
@@ -388,6 +433,10 @@ mod tests {
     #[test]
     fn test_log_trade_with_not_matched_result() {
         // 测试log_trade函数，交易不匹配的情况
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get system time")
+            .as_millis() as i64;
         let round = 5;
         let trade_id = 102;
         let task_id = "test_task_567".to_string();
@@ -396,16 +445,22 @@ mod tests {
 
         // 创建测试用的Product
         let product = Product::new(1, "TestProduct".to_string());
-        // 创建测试用的Agent，使用正确的参数
-        let agent = Arc::new(RwLock::new(Agent::new(1, "TestAgent".to_string(), 1000.0, &[product.clone()])));
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
         let sql = log_trade(
+            timestamp,
             round,
             trade_id,
             task_id.clone(),
-            agent.clone(),
+            1, // agent_id
+            "TestAgent".to_string(), // agent_name
+            1000.0, // agent_cash
+            100.0, // agent_pref_original_price
+            0.5, // agent_pref_original_elastic
+            98.0, // agent_pref_current_price
+            90.0, // agent_pref_current_range_lower
+            110.0, // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
@@ -421,6 +476,10 @@ mod tests {
     #[test]
     fn test_log_trade_with_not_yet_result() {
         // 测试log_trade函数，交易尚未进行的情况
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get system time")
+            .as_millis() as i64;
         let round = 5;
         let trade_id = 103;
         let task_id = "test_task_567".to_string();
@@ -429,16 +488,22 @@ mod tests {
 
         // 创建测试用的Product
         let product = Product::new(1, "TestProduct".to_string());
-        // 创建测试用的Agent，使用正确的参数
-        let agent = Arc::new(RwLock::new(Agent::new(1, "TestAgent".to_string(), 1000.0, &[product.clone()])));
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
         let sql = log_trade(
+            timestamp,
             round,
             trade_id,
             task_id.clone(),
-            agent.clone(),
+            1, // agent_id
+            "TestAgent".to_string(), // agent_name
+            1000.0, // agent_cash
+            100.0, // agent_pref_original_price
+            0.5, // agent_pref_original_elastic
+            98.0, // agent_pref_current_price
+            90.0, // agent_pref_current_range_lower
+            110.0, // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
