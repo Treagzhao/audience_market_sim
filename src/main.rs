@@ -2,13 +2,15 @@ mod entity;
 mod logging;
 mod model;
 mod util;
-
 use crate::entity::normal_distribute::NormalDistribution;
+use crate::logging::Logger;
+use parking_lot::deadlock;
 use rand::{Rng, distributions::Alphanumeric};
 use std::fs::File;
 use std::io::Read;
+use std::thread;
+use std::time::Duration;
 use toml::Value;
-use crate::logging::Logger;
 
 /// 从config.toml文件初始化产品列表
 fn init_products() -> Vec<crate::model::product::Product> {
@@ -119,7 +121,25 @@ fn main() {
         logger.set_task_id(task_id.clone());
         drop(logger);
     }
-
+    // 启动一个线程定期检测死锁
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_secs(1));
+            let deadlocks = deadlock::check_deadlock();
+            if !deadlocks.is_empty() {
+                let deadlock_threads = &deadlocks[0];
+                if deadlock_threads.len() > 0 {
+                    let deadlock_thread = &deadlock_threads[0];
+                    println!("检测到死锁! 线程 {:?} ", deadlock_thread.thread_id());
+                    {
+                        let backtrace = deadlock_thread.backtrace();
+                        println!("死锁线程 {:?} 的调用栈:", deadlock_thread.thread_id());
+                        println!("{:?}", backtrace);
+                    }
+                }
+            }
+        }
+    });
     println!("Initializing products from config.toml...");
     let products = init_products();
     println!("Successfully initialized {} products!", products.len());

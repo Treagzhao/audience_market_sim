@@ -114,12 +114,15 @@ impl Agent {
                 let product_id = *preferences.keys().nth(index).unwrap();
                 drop(preferences);
                 // 检查该商品是否已经在demand中
-
-                let Some(demand) = d.try_read() else {
-                    continue;
+                let is_already_demanded = {
+                    let Some(demand) = d.try_read() else {
+                        continue;
+                    };
+                    let is_already_demanded = demand.contains_key(&product_id);
+                    drop(demand);
+                    is_already_demanded
                 };
-                let is_already_demanded = demand.contains_key(&product_id);
-                drop(demand);
+
                 // 如果不在demand中，才添加
                 if !is_already_demanded {
                     let Some(mut demand) = d.try_write() else {
@@ -203,14 +206,14 @@ impl Agent {
             if random_value < delete_probability {
                 // 删除demand
                 {
-                    // 新增作用域括号
-                    let mut demand = self.demand.write();
-                    println!(
-                        "handle trade failure checkpoint 5 agent_id:{} factory_id:{:?}",
-                        self.id,
-                        factory.id()
-                    );
-                    demand.remove(&product_id);
+                    // // 新增作用域括号
+                    // let mut demand = self.demand.write();
+                    // println!(
+                    //     "handle trade failure checkpoint 5 agent_id:{} factory_id:{:?}",
+                    //     self.id,
+                    //     factory.id()
+                    // );
+                    // demand.remove(&product_id);
 
                     // 记录需求删除日志
                     let preference = g.get(&product_id).unwrap();
