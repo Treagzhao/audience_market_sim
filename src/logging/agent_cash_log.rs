@@ -39,6 +39,7 @@ impl AgentCashLog {
 
 pub fn log_agent_cash(
     timestamp: i64,
+    task_id: String,
     round: u64,
     agent_id: u64,
     agent_name: String,
@@ -49,12 +50,12 @@ pub fn log_agent_cash(
     let sql = format!(
         r#"
                 INSERT INTO agent_cash_logs (
-                    timestamp, round, agent_id, agent_name, cash, total_trades
+                    timestamp, task_id, round, agent_id, agent_name, cash, total_trades
                 ) VALUES (
-                    {}, {}, {}, '{}', {}, {}
+                    {}, '{}',{}, {}, '{}', {}, {}
                 )
             "#,
-        timestamp, round, agent_id, agent_name, cash, total_trades
+        timestamp, task_id, round, agent_id, agent_name, cash, total_trades
     );
     sql
 }
@@ -111,6 +112,7 @@ mod tests {
 
         let sql = log_agent_cash(
             timestamp,
+            "test_task_456".to_string(),
             round,
             agent_id,
             agent_name.clone(),
@@ -146,7 +148,15 @@ mod tests {
         let cash = 0.0;
         let total_trades = 0;
 
-        let sql = log_agent_cash(timestamp, round, agent_id, agent_name, cash, total_trades);
+        let sql = log_agent_cash(
+            timestamp,
+            "test_task_789".to_string(),
+            round,
+            agent_id,
+            agent_name,
+            cash,
+            total_trades,
+        );
 
         // 验证SQL可以正确解析，没有语法错误
         assert!(sql.contains("'Agent with 'quotes' and \\slashes'"));
