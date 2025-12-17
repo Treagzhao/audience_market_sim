@@ -52,6 +52,7 @@ impl Market {
                 format!("Consumer_{}", agent_id),
                 1000.0,
                 &products,
+                true,
             );
             agents_vec.push(Arc::new(RwLock::new(agent)));
         }
@@ -256,7 +257,7 @@ fn process_product_trades(
 
             // 获取agents的可变锁
             let mut agents = agents_clone.read();
-            //println!("current dealing product :{:?} factory_id:{:?}",product_id,factory.id());
+            println!("current dealing product :{:?} factory_id:{:?}",product_id,factory.id());
             // 让每个agent与工厂进行交易
             for a in agents.iter() {
                 let (agent_id, agent_name) = {
@@ -268,68 +269,20 @@ fn process_product_trades(
                 if factory.get_stock(round) <= 0 {
                     break;
                 }
-                println!(
-                    "checkpoint 1 for product:{:?} factory_id:{:?} agent_id:{:?}",
-                    product_id,
-                    factory.id(),
-                    agent_id
-                );
                 let has_demand = {
                     let agent = a.read();
                     agent.has_demand(product_id)
                 };
-                println!(
-                    "checkpoint 2 for product:{:?} factory_id:{:?} agent_id:{:?}",
-                    product_id,
-                    factory.id(),
-                    agent_id
-                );
                 let mut trade_result = TradeResult::NotYet;
                 let mut interval_relation = None;
-                println!(
-                    "checkpoint 3 for product:{:?} factory_id:{:?} agent_id:{:?}",
-                    product_id,
-                    factory.id(),
-                    agent_id
-                );
                 if !has_demand {
                     trade_result = TradeResult::NotMatched;
                 } else {
-                    println!(
-                        "else branch for product :{:?} factory_id:{:?} agent_id:{:?}",
-                        product_id,
-                        factory.id(),
-                        agent_id
-                    );
                     let mut agent = a.write();
-                    println!(
-                        "get mutex for product :{:?} factory_id:{:?} agent_id:{:?}",
-                        product_id,
-                        factory.id(),
-                        agent_id
-                    );
                     // 调用agent的trade方法
                     (trade_result, interval_relation) = agent.trade(factory, round);
-                    println!(
-                        "agent trade after for product :{:?} factory_id:{:?} agent_id:{:?}",
-                        product_id,
-                        factory.id(),
-                        agent_id
-                    );
                     drop(agent);
-                    println!(
-                        "drop mutex for product :{:?} factory_id:{:?} agent_id:{:?}",
-                        product_id,
-                        factory.id(),
-                        agent_id
-                    );
                 }
-                println!(
-                    "checkpoint 4 for product:{:?} factory_id:{:?} agent_id:{:?}",
-                    product_id,
-                    factory.id(),
-                    agent_id
-                );
                 // 将interval_relation转换为字符串
                 let interval_relation_str = match &interval_relation {
                     Some(rel) => match rel {

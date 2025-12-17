@@ -1,3 +1,4 @@
+use crate::logging::LOGGER;
 use crate::model::agent::preference::Preference;
 use crate::model::factory::Factory;
 use crate::model::product::Product;
@@ -13,7 +14,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
-use crate::logging::LOGGER;
 
 mod preference;
 
@@ -23,7 +23,6 @@ pub struct Agent {
     preferences: Arc<RwLock<HashMap<u64, Preference>>>,
     cash: f64,
     demand: Arc<RwLock<HashMap<u64, bool>>>,
-
 }
 
 /// 区间关系枚举，表示两个区间之间的关系
@@ -50,7 +49,7 @@ pub enum TradeResult {
 }
 
 impl Agent {
-    pub fn new(id: u64, name: String, cash: f64, products: &[Product]) -> Self {
+    pub fn new(id: u64, name: String, cash: f64, products: &[Product], auto_demand: bool) -> Self {
         // 为每个商品生成preference
         let mut preferences_map = HashMap::new();
         for product in products {
@@ -65,7 +64,9 @@ impl Agent {
             cash,
             demand: Arc::new(RwLock::new(HashMap::new())),
         };
-        agent.desire();
+        if auto_demand {
+            agent.desire();
+        }
         agent
     }
 
@@ -181,40 +182,20 @@ impl Agent {
     ) {
         // 根据1-preference.elastic的概率决定是否删除demand
         let mut rng = rand::thread_rng();
-        println!(
-            "handle trade failure checkpoint 1 agent_id:{} factory_id:{:?}",
-            self.id,
-            factory.id()
-        );
         let mut g = self.preferences.write();
-        println!(
-            "handle trade failure checkpoint 2 agent_id:{} factory_id:{:?}",
-            self.id,
-            factory.id()
-        );
         if let Some(preference) = g.get_mut(&product_id) {
             // 计算概率：弹性值本身，弹性越大，越容易删除需求
             let delete_probability = preference.original_elastic;
-            println!(
-                "handle trade failure checkpoint 3 agent_id:{} factory_id:{:?}",
-                self.id,
-                factory.id()
-            );
             // 生成随机数（0.0到1.0）
             let random_value = rng.gen_range(0.0..1.0);
 
             if random_value < delete_probability {
                 // 删除demand
                 {
-                    // // 新增作用域括号
-                    // let mut demand = self.demand.write();
-                    // println!(
-                    //     "handle trade failure checkpoint 5 agent_id:{} factory_id:{:?}",
-                    //     self.id,
-                    //     factory.id()
-                    // );
-                    // demand.remove(&product_id);
-
+                    // 新增作用域括号
+                    let mut demand = self.demand.write();
+                    demand.remove(&product_id);
+                    drop(demand);
                     // 记录需求删除日志
                     let preference = g.get(&product_id).unwrap();
                     let logger = LOGGER.write();
@@ -328,57 +309,31 @@ impl Agent {
     }
 
     fn remove_demand(&mut self, product_id: u64, round: u64, reason: &str) {
-        // println!(
-        //     "remove_demand checkpoint 1 agent_id:{:?} product_id:{:?}",
-        //     self.id, product_id
-        // );
-        //
-        // let mut g = self.demand.write().unwrap();
-        // println!(
-        //     "remove_demand checkpoint 2 agent_id:{:?} product_id:{:?}",
-        //     self.id, product_id
-        // );
-        // g.remove(&product_id);
-        // println!(
-        //     "remove_demand checkpoint 3 agent_id:{:?} product_id:{:?}",
-        //     self.id, product_id
-        // );
-        // drop(g);
-        // println!(
-        //     "remove_demand checkpoint 4 agent_id:{:?} product_id:{:?}",
-        //     self.id, product_id
-        // );
-        // // 记录需求删除日志
-        // let preferences = self.preferences.read().unwrap();
-        // println!(
-        //     "remove_demand checkpoint 5 agent_id:{:?} product_id:{:?}",
-        //     self.id, product_id
-        // );
-        // if let Some(preference) = preferences.get(&product_id) {
-        //     println!(
-        //         "remove_demand checkpoint 6 agent_id:{:?} product_id:{:?}",
-        //         self.id, product_id
-        //     );
-        //     if let Err(e) = crate::logging::log_agent_demand_removal(
-        //         round,
-        //         self.id,
-        //         self.name.clone(),
-        //         product_id,
-        //         self.cash,
-        //         Some(preference.original_price),
-        //         Some(preference.original_elastic),
-        //         Some(preference.current_price),
-        //         Some(preference.current_range.0),
-        //         Some(preference.current_range.1),
-        //         reason,
-        //     ) {
-        //         println!("Failed to log agent demand removal: {}", e);
-        //     }
-        //     println!(
-        //         "remove_demand checkpoint 7 agent_id:{:?} product_id:{:?}",
-        //         self.id, product_id
-        //     );
-        // }
+        let mut g = self.demand.write();
+        g.remove(&product_id);
+        drop(g);
+
+        // 记录需求删除日志
+        let preferences = self.preferences.read();
+
+        if let Some(preference) = preferences.get(&product_id) {
+            let logger = LOGGER.write();
+            if let Err(e) = logger.log_agent_demand_removal(
+                round,
+                self.id,
+                self.name.clone(),
+                product_id,
+                self.cash,
+                Some(preference.original_price),
+                Some(preference.original_elastic),
+                Some(preference.current_price),
+                Some(preference.current_range.0),
+                Some(preference.current_range.1),
+                reason,
+            ) {
+                println!("Failed to log agent demand removal: {}", e);
+            }
+        }
     }
 
     pub fn trade(
@@ -393,62 +348,22 @@ impl Agent {
         );
         let has_demand = self.has_demand(factory.product_id());
         if !has_demand {
-            println!(
-                "return point 0 agent_id:{:?} factory_id:{:?}",
-                self.id(),
-                factory.id()
-            );
             return (TradeResult::NotMatched, None);
         }
-        println!(
-            "inner check point  1 agent_id:{:?} factory_id:{:?}",
-            self.id(),
-            factory.id()
-        );
         let interval_relation = self.match_factory(factory);
-        println!(
-            "inner check point  2 agent_id:{:?} factory_id:{:?}",
-            self.id(),
-            factory.id()
-        );
         let product_id = factory.product_id();
 
         match interval_relation {
             IntervalRelation::Overlapping(range) => {
                 let price = gen_price_in_range(range, self.cash);
-                println!(
-                    "inner check point 3 branch 1 agent_id:{:?} factory_id:{:?}",
-                    self.id(),
-                    factory.id()
-                );
                 if price.is_none() {
-                    println!(
-                        "return point 1 agent_id:{:?} factory_id:{:?}",
-                        self.id(),
-                        factory.id()
-                    );
                     self.handle_trade_failure(factory, product_id, round, false);
                     return (TradeResult::Failed, Some(interval_relation));
                 }
-                println!(
-                    "inner check point 3 branch 1.0 agent_id:{:?} factory_id:{:?}",
-                    self.id(),
-                    factory.id()
-                );
                 self.remove_demand(product_id, round, "successful_trade");
-                println!(
-                    "inner check point 3 branch 1.1 agent_id:{:?} factory_id:{:?}",
-                    self.id(),
-                    factory.id()
-                );
                 let price = price.unwrap();
                 self.cash -= price;
                 let mut g = self.preferences.write();
-                println!(
-                    "inner check point 3 branch 1.2 agent_id:{:?} factory_id:{:?}",
-                    self.id(),
-                    factory.id()
-                );
                 let preference = g.get_mut(&product_id).unwrap();
                 preference.current_price = price;
                 let (new_min, new_max) =
@@ -473,11 +388,6 @@ impl Agent {
                     } else {
                         0.0
                     };
-                    println!(
-                        "inner check point 3 branch 1.3 agent_id:{:?} factory_id:{:?}",
-                        self.id(),
-                        factory.id()
-                    );
                     let mut logger = LOGGER.write();
                     // 调用日志记录函数
                     if let Err(e) = logger.log_agent_range_adjustment(
@@ -500,41 +410,16 @@ impl Agent {
 
                     preference.current_range = (new_min, new_max);
                 }
-                println!(
-                    "return point 2 agent_id:{:?} factory_id:{:?}",
-                    self.id(),
-                    factory.id()
-                );
                 return (TradeResult::Success(price), Some(interval_relation));
             }
             IntervalRelation::AgentBelowFactory => {
-                println!(
-                    "inner check point 3 branch 2 agent_id:{:?} factory_id:{:?}",
-                    self.id(),
-                    factory.id()
-                );
                 // 代理价格低于工厂，商家售价太高，上移3%
                 self.handle_trade_failure(factory, product_id, round, true);
-                println!(
-                    "return point 3 agent_id:{:?} factory_id:{:?}",
-                    self.id(),
-                    factory.id()
-                );
                 return (TradeResult::Failed, Some(interval_relation));
             }
             IntervalRelation::AgentAboveFactory => {
-                println!(
-                    "inner check point 3 branch 3 agent_id:{:?} factory_id:{:?}",
-                    self.id(),
-                    factory.id()
-                );
                 // 代理价格高于工厂，商家售价太低，下移3%
                 self.handle_trade_failure(factory, product_id, round, false);
-                println!(
-                    "return point 4 agent_id:{:?} factory_id:{:?}",
-                    self.id(),
-                    factory.id()
-                );
                 return (TradeResult::Failed, Some(interval_relation));
             }
         }
@@ -552,7 +437,7 @@ mod tests {
         let cash = 100.0;
         let products = Vec::new(); // 空产品列表
 
-        let agent = Agent::new(id, name.clone(), cash, &products);
+        let agent = Agent::new(id, name.clone(), cash, &products, true);
 
         assert_eq!(agent.id(), id);
         assert_eq!(agent.name(), name);
@@ -636,7 +521,7 @@ mod tests {
             ),
         ];
 
-        let mut agent = Agent::new(id, name, cash, &products);
+        let mut agent = Agent::new(id, name, cash, &products, true);
 
         // 调用desire方法启动需求生成线程
         agent.desire();
@@ -702,7 +587,7 @@ mod tests {
         let agent_name = "test_agent".to_string();
         let initial_cash = 100.0;
         let products = vec![product.clone()];
-        let mut agent = Agent::new(agent_id, agent_name, initial_cash, &products);
+        let mut agent = Agent::new(agent_id, agent_name, initial_cash, &products, false);
 
         // 设置Agent的偏好和需求
         let initial_range = (40.0, 60.0);
@@ -861,7 +746,7 @@ mod tests {
 
             // 每次尝试创建新的Agent和Factory
             let products = vec![product.clone()];
-            let mut agent = Agent::new(agent_id, agent_name.clone(), initial_cash, &products);
+            let mut agent = Agent::new(agent_id, agent_name.clone(), initial_cash, &products, true);
 
             // 设置Agent的偏好和需求，range为(40.0, 100.0)，确保cash(50.0)在范围内
             let initial_range = (40.0, 100.0);
@@ -941,7 +826,7 @@ mod tests {
 
         // 创建Agent和Product列表
         let products = vec![product.clone()];
-        let mut agent = Agent::new(agent_id, agent_name, initial_cash, &products);
+        let mut agent = Agent::new(agent_id, agent_name, initial_cash, &products, true);
 
         // 设置Agent的偏好和需求，range为(40.0, 60.0)，cash(20.0)不在范围内
         let initial_range = (40.0, 60.0);
@@ -1028,7 +913,7 @@ mod tests {
         let name = "test_agent".to_string();
         let cash = 100.0;
         let products = vec![product];
-        let mut agent = Agent::new(id, name, cash, &products);
+        let mut agent = Agent::new(id, name, cash, &products, true);
 
         // 添加需求
         {
@@ -1076,7 +961,7 @@ mod tests {
         let name = "test_agent".to_string();
         let cash = 100.0;
         let products = vec![product];
-        let mut agent = Agent::new(id, name, cash, &products);
+        let mut agent = Agent::new(id, name, cash, &products, true);
 
         // 清除所有需求，确保没有需求
         {
@@ -1124,7 +1009,7 @@ mod tests {
         let name = "test_agent".to_string();
         let cash = 100.0;
         let products = vec![product];
-        let mut agent = Agent::new(id, name, cash, &products);
+        let mut agent = Agent::new(id, name, cash, &products, false);
 
         // 添加需求
         {
@@ -1182,7 +1067,7 @@ mod tests {
         let name = "test_agent".to_string();
         let cash = 100.0;
         let products = vec![product];
-        let mut agent = Agent::new(id, name, cash, &products);
+        let mut agent = Agent::new(id, name, cash, &products, false);
 
         // 确保没有需求
         {
@@ -1215,7 +1100,7 @@ mod tests {
         let name = "test_agent".to_string();
         let initial_cash = 100.0;
         let products = Vec::new(); // 空产品列表
-        let mut agent = Agent::new(id, name, initial_cash, &products);
+        let mut agent = Agent::new(id, name, initial_cash, &products, true);
 
         // 定义收入范围
         let income_range = (50.0, 150.0);
