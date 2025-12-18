@@ -9,6 +9,7 @@ CREATE TABLE agent_range_adjustment_logs (
     agent_id BIGINT INVERTED INDEX,                 -- 主体ID
     agent_name STRING,               -- 主体名称
     product_id BIGINT INVERTED INDEX,               -- 产品ID
+    product_category STRING INVERTED INDEX,         -- 产品类别
     adjustment_type STRING,          -- 调整类型：trade_success 或 trade_failed
     
     -- 字段（数值型数据，用于聚合分析）

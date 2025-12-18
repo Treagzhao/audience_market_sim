@@ -19,6 +19,7 @@ pub struct TradeLog {
     pub factory_name: String,
     pub product_id: u64,
     pub product_name: String,
+    pub product_category: String,
     pub trade_result: String,
     pub interval_relation: String,
     pub price: f64,
@@ -59,6 +60,7 @@ impl TradeLog {
         };
 
         let (lower, upper) = factory.supply_price_range();
+        let product_category = format!("{:?}", factory.product_category());
 
         TradeLog {
             timestamp,
@@ -72,6 +74,7 @@ impl TradeLog {
             factory_name: factory.name().to_string(),
             product_id: product.id(),
             product_name: product.name().to_string(),
+            product_category,
             trade_result: result_str.to_string(),
             interval_relation: interval_relation.to_string(),
             price: price.unwrap_or(-1.0),
@@ -129,13 +132,13 @@ pub fn log_trade(
         r#"
                 INSERT INTO trade_logs (
                     timestamp, round, trade_id, task_id, agent_id, agent_name, agent_cash,
-                    factory_id, factory_name, product_id, product_name, trade_result, interval_relation, price,
+                    factory_id, factory_name, product_id, product_name, product_category, trade_result, interval_relation, price,
                     factory_supply_range_lower, factory_supply_range_upper, factory_stock,
                     agent_pref_original_price, agent_pref_original_elastic, agent_pref_current_price,
                     agent_pref_current_range_lower, agent_pref_current_range_upper
                 ) VALUES (
                     {}, {}, {}, '{}', {}, '{}', {},
-                    {}, '{}', {}, '{}', '{}', '{}', {},
+                    {}, '{}', {}, '{}', '{}', '{}', '{}', {},
                     {}, {}, {},
                     {}, {}, {},
                     {}, {}
@@ -152,6 +155,7 @@ pub fn log_trade(
         log.factory_name,
         log.product_id,
         log.product_name,
+        log.product_category,
         log.trade_result,
         log.interval_relation,
         log.price,

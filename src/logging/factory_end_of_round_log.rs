@@ -6,6 +6,7 @@ pub struct FactoryEndOfRoundLog {
     pub factory_id: u64,
     pub factory_name: String,
     pub product_id: u64,
+    pub product_category: String,
     pub cash: f64,
     pub initial_stock: i16,
     pub remaining_stock: i16,
@@ -21,6 +22,7 @@ impl FactoryEndOfRoundLog {
         factory_id: u64,
         factory_name: String,
         product_id: u64,
+        product_category: String,
         cash: f64,
         initial_stock: i16,
         remaining_stock: i16,
@@ -34,6 +36,7 @@ impl FactoryEndOfRoundLog {
             factory_id,
             factory_name,
             product_id,
+            product_category,
             cash,
             initial_stock,
             remaining_stock,
@@ -54,6 +57,7 @@ pub fn generate_create_table_sql() -> String {
         factory_id INT UNSIGNED NOT NULL,
         factory_name VARCHAR(255) NOT NULL,
         product_id INT UNSIGNED NOT NULL,
+        product_category VARCHAR(255) NOT NULL,
         cash DOUBLE NOT NULL,
         initial_stock SMALLINT NOT NULL,
         remaining_stock SMALLINT NOT NULL,
@@ -71,6 +75,7 @@ pub fn log_factory_end_of_round(
     factory_id: u64,
     factory_name: String,
     product_id: u64,
+    product_category: String,
     cash: f64,
     initial_stock: i16,
     remaining_stock: i16,
@@ -84,6 +89,7 @@ pub fn log_factory_end_of_round(
         factory_id,
         factory_name.clone(),
         product_id,
+        product_category,
         cash,
         initial_stock,
         remaining_stock,
@@ -95,10 +101,10 @@ pub fn log_factory_end_of_round(
     let sql = format!(
         r#"
                 INSERT INTO factory_end_of_round_logs (
-                    timestamp, round, task_id, factory_id, factory_name, product_id,
+                    timestamp, round, task_id, factory_id, factory_name, product_id, product_category,
                     cash, initial_stock, remaining_stock, supply_range_lower, supply_range_upper
                 ) VALUES (
-                    {}, {}, '{}', {}, '{}', {},
+                    {}, {}, '{}', {}, '{}', {}, '{}',
                     {}, {}, {}, {}, {}
                 )
             "#,
@@ -108,6 +114,7 @@ pub fn log_factory_end_of_round(
         log.factory_id,
         log.factory_name,
         log.product_id,
+        log.product_category,
         log.cash,
         log.initial_stock,
         log.remaining_stock,
@@ -143,6 +150,7 @@ mod tests {
             factory_id,
             factory_name.clone(),
             product_id,
+            "TestCategory".to_string(),
             cash,
             initial_stock,
             remaining_stock,
@@ -157,6 +165,7 @@ mod tests {
         assert_eq!(log.factory_id, factory_id);
         assert_eq!(log.factory_name, factory_name);
         assert_eq!(log.product_id, product_id);
+        assert_eq!(log.product_category, "TestCategory");
         assert_eq!(log.cash, cash);
         assert_eq!(log.initial_stock, initial_stock);
         assert_eq!(log.remaining_stock, remaining_stock);
@@ -186,6 +195,7 @@ mod tests {
             factory_id,
             factory_name.clone(),
             product_id,
+            "TestCategory".to_string(),
             cash,
             initial_stock,
             remaining_stock,
@@ -215,6 +225,7 @@ mod tests {
         assert!(sql.contains("factory_id INT UNSIGNED NOT NULL"));
         assert!(sql.contains("factory_name VARCHAR(255) NOT NULL"));
         assert!(sql.contains("product_id INT UNSIGNED NOT NULL"));
+        assert!(sql.contains("product_category VARCHAR(255) NOT NULL"));
         assert!(sql.contains("cash DOUBLE NOT NULL"));
         assert!(sql.contains("initial_stock SMALLINT NOT NULL"));
         assert!(sql.contains("remaining_stock SMALLINT NOT NULL"));
@@ -248,6 +259,7 @@ mod tests {
             factory_id,
             factory_name.clone(),
             product_id,
+            "TestCategory".to_string(),
             cash,
             initial_stock,
             remaining_stock,
@@ -263,6 +275,7 @@ mod tests {
         assert!(sql.contains("factory_id"));
         assert!(sql.contains("factory_name"));
         assert!(sql.contains("product_id"));
+        assert!(sql.contains("product_category"));
         assert!(sql.contains("cash"));
         assert!(sql.contains("initial_stock"));
         assert!(sql.contains("remaining_stock"));
@@ -276,6 +289,7 @@ mod tests {
         assert!(sql.contains(&factory_id.to_string()));
         assert!(sql.contains(&factory_name));
         assert!(sql.contains(&product_id.to_string()));
+        assert!(sql.contains(&"TestCategory"));
         assert!(sql.contains(&cash.to_string()));
         assert!(sql.contains(&initial_stock.to_string()));
         assert!(sql.contains(&remaining_stock.to_string()));
@@ -305,6 +319,7 @@ mod tests {
             factory_id,
             factory_name.clone(),
             product_id,
+            "TestCategory".to_string(),
             cash,
             initial_stock,
             remaining_stock,
@@ -316,6 +331,8 @@ mod tests {
         assert!(sql.contains("INSERT INTO factory_end_of_round_logs"));
         assert!(sql.contains(&initial_stock.to_string()));
         assert!(sql.contains(&remaining_stock.to_string()));
+        assert!(sql.contains(&"TestCategory"));
+        assert!(sql.contains(&"TestCategory"));
     }
 
     #[test]
@@ -340,6 +357,7 @@ mod tests {
             factory_id,
             factory_name.clone(),
             product_id,
+            "TestCategory".to_string(),
             cash,
             initial_stock,
             remaining_stock,

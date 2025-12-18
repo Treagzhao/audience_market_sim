@@ -8,6 +8,7 @@ pub struct AgentRangeAdjustmentLog {
     pub agent_id: u64,
     pub agent_name: String,
     pub product_id: u64,
+    pub product_category: String,
     pub old_range_lower: f64,
     pub old_range_upper: f64,
     pub new_range_lower: f64,
@@ -28,6 +29,7 @@ impl AgentRangeAdjustmentLog {
         agent_id: u64,
         agent_name: String,
         product_id: u64,
+        product_category: String,
         old_range: (f64, f64),
         new_range: (f64, f64),
         lower_change: f64,
@@ -50,6 +52,7 @@ impl AgentRangeAdjustmentLog {
             agent_id,
             agent_name,
             product_id,
+            product_category,
             old_range_lower: old_range.0,
             old_range_upper: old_range.1,
             new_range_lower: new_range.0,
@@ -71,6 +74,7 @@ pub fn log_agent_range_adjustment(
     agent_id: u64,
     agent_name: String,
     product_id: u64,
+    product_category: String,
     old_range: (f64, f64),
     new_range: (f64, f64),
     lower_change: f64,
@@ -87,6 +91,7 @@ pub fn log_agent_range_adjustment(
         agent_id,
         agent_name,
         product_id,
+        product_category,
         old_range,
         new_range,
         lower_change,
@@ -102,12 +107,12 @@ pub fn log_agent_range_adjustment(
     let sql = format!(
         r#"
                 INSERT INTO agent_range_adjustment_logs (
-                    timestamp, round, task_id, agent_id, agent_name, product_id,
+                    timestamp, round, task_id, agent_id, agent_name, product_id, product_category,
                     old_range_lower, old_range_upper, new_range_lower, new_range_upper,
                     lower_change, upper_change, min_change_ratio, max_change_ratio,
                     center, adjustment_type, price
                 ) VALUES (
-                    {}, {}, '{}', {}, '{}', {},
+                    {}, {}, '{}', {}, '{}', {}, '{}',
                     {}, {}, {}, {},
                     {}, {}, {}, {},
                     {}, '{}', {}
@@ -119,6 +124,7 @@ pub fn log_agent_range_adjustment(
         log.agent_id,
         log.agent_name,
         log.product_id,
+        log.product_category,
         log.old_range_lower,
         log.old_range_upper,
         log.new_range_lower,
@@ -163,6 +169,7 @@ mod tests {
             agent_id,
             agent_name.clone(),
             product_id,
+            "TestCategory".to_string(),
             old_range,
             new_range,
             lower_change,
@@ -187,6 +194,7 @@ mod tests {
         assert_eq!(log.agent_id, agent_id);
         assert_eq!(log.agent_name, agent_name);
         assert_eq!(log.product_id, product_id);
+        assert_eq!(log.product_category, "TestCategory");
         assert_eq!(log.old_range_lower, old_range.0);
         assert_eq!(log.old_range_upper, old_range.1);
         assert_eq!(log.new_range_lower, new_range.0);
@@ -198,6 +206,7 @@ mod tests {
         assert_eq!(log.center, center);
         assert_eq!(log.adjustment_type, adjustment_type);
         assert_eq!(log.price, price);
+        assert_eq!(log.product_category, "TestCategory");
     }
 
     #[test]
@@ -224,6 +233,7 @@ mod tests {
             agent_id,
             agent_name.clone(),
             product_id,
+            "TestCategory".to_string(),
             old_range,
             new_range,
             lower_change,
@@ -263,6 +273,7 @@ mod tests {
             agent_id,
             agent_name.clone(),
             product_id,
+            "TestCategory".to_string(),
             old_range,
             new_range,
             lower_change,
@@ -282,6 +293,7 @@ mod tests {
         assert!(sql.contains("agent_id"));
         assert!(sql.contains("agent_name"));
         assert!(sql.contains("product_id"));
+        assert!(sql.contains("product_category"));
         assert!(sql.contains("old_range_lower"));
         assert!(sql.contains("old_range_upper"));
         assert!(sql.contains("new_range_lower"));
@@ -300,6 +312,7 @@ mod tests {
         assert!(sql.contains(&agent_id.to_string()));
         assert!(sql.contains(&agent_name));
         assert!(sql.contains(&product_id.to_string()));
+        assert!(sql.contains(&"TestCategory"));
         assert!(sql.contains(&old_range.0.to_string()));
         assert!(sql.contains(&old_range.1.to_string()));
         assert!(sql.contains(&new_range.0.to_string()));
@@ -332,6 +345,7 @@ mod tests {
             agent_id,
             agent_name,
             product_id,
+            "TestCategory".to_string(),
             old_range,
             new_range,
             lower_change,
@@ -348,5 +362,6 @@ mod tests {
         assert_eq!(log.price, price);
         assert_eq!(log.agent_id, agent_id);
         assert_eq!(log.product_id, product_id);
+        assert_eq!(log.product_category, "TestCategory");
     }
 }

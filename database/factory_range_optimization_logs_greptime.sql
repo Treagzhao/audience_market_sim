@@ -9,6 +9,7 @@ CREATE TABLE factory_range_optimization_logs (
     factory_id BIGINT INVERTED INDEX,               -- 工厂ID
     factory_name STRING,             -- 工厂名称
     product_id BIGINT INVERTED INDEX,               -- 产品ID
+    product_category STRING INVERTED INDEX,         -- 产品类别
     trade_result STRING,             -- 交易结果（Success/Failed）
     
     -- 字段（数值型数据，用于聚合分析）

@@ -119,7 +119,7 @@ impl Agent {
                     insert_demand(preferences, d.clone());
                 }
 
-                let wait_time = rng.gen_range(0..100);
+                let wait_time = rng.gen_range(100..500);
                 thread::sleep(Duration::from_millis(wait_time));
             }
         });
@@ -277,6 +277,7 @@ impl Agent {
                         self.id,
                         self.name.clone(),
                         product_id,
+                        format!("{:?}", category),
                         (old_min, old_max),
                         (new_min, new_max),
                         min_change_value,
@@ -392,6 +393,7 @@ impl Agent {
                         self.id(),
                         self.name().to_string(),
                         product_id,
+                        format!("{:?}", factory.product_category()),
                         (old_min, old_max),
                         (new_min, new_max),
                         min_change_value,
@@ -437,7 +439,7 @@ fn insert_demand(preference: &HashMap<u64, Preference>, demand: Arc<RwLock<HashM
             continue;
         }
         let random = rng.gen_range(0.01..0.99);
-        if random < preference.original_elastic {
+        if random > preference.original_elastic {
             let mut demand = demand.write();
             demand.insert(**product_id, true);
             break;
