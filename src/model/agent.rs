@@ -451,6 +451,7 @@ mod tests {
             Product::from(
                 1,
                 "product_1".to_string(),
+                crate::model::product::ProductCategory::Food,
                 crate::entity::normal_distribute::NormalDistribution::new(
                     10.0,
                     1,
@@ -473,6 +474,7 @@ mod tests {
             Product::from(
                 2,
                 "product_2".to_string(),
+                crate::model::product::ProductCategory::Food,
                 crate::entity::normal_distribute::NormalDistribution::new(
                     20.0,
                     2,
@@ -495,6 +497,7 @@ mod tests {
             Product::from(
                 3,
                 "product_3".to_string(),
+                crate::model::product::ProductCategory::Food,
                 crate::entity::normal_distribute::NormalDistribution::new(
                     30.0,
                     3,
@@ -557,6 +560,7 @@ mod tests {
         let product = crate::model::product::Product::from(
             product_id,
             "test_product".to_string(),
+            crate::model::product::ProductCategory::Food,
             crate::entity::normal_distribute::NormalDistribution::new(
                 50.0,
                 product_id,
@@ -719,6 +723,7 @@ mod tests {
             let product = crate::model::product::Product::from(
                 product_id,
                 "test_product".to_string(),
+                crate::model::product::ProductCategory::Food,
                 crate::entity::normal_distribute::NormalDistribution::new(
                     60.0,
                     product_id,
@@ -799,6 +804,7 @@ mod tests {
         let product = crate::model::product::Product::from(
             product_id,
             "test_product".to_string(),
+            crate::model::product::ProductCategory::Food,
             crate::entity::normal_distribute::NormalDistribution::new(
                 50.0,
                 product_id,
@@ -883,6 +889,7 @@ mod tests {
         let product = crate::model::product::Product::from(
             product_id,
             "test_product".to_string(),
+            crate::model::product::ProductCategory::Food, // 添加缺失的product_category参数
             crate::entity::normal_distribute::NormalDistribution::new(
                 10.0,
                 product_id,
@@ -931,6 +938,7 @@ mod tests {
         let product = crate::model::product::Product::from(
             product_id,
             "test_product".to_string(),
+            crate::model::product::ProductCategory::Food, // 添加缺失的product_category参数
             crate::entity::normal_distribute::NormalDistribution::new(
                 10.0,
                 product_id,
@@ -979,6 +987,7 @@ mod tests {
         let product = crate::model::product::Product::from(
             product_id,
             "test_product".to_string(),
+            crate::model::product::ProductCategory::Food, // 添加缺失的product_category参数
             crate::entity::normal_distribute::NormalDistribution::new(
                 10.0,
                 product_id,
@@ -1037,6 +1046,7 @@ mod tests {
         let product = crate::model::product::Product::from(
             product_id,
             "test_product".to_string(),
+            crate::model::product::ProductCategory::Food,
             crate::entity::normal_distribute::NormalDistribution::new(
                 10.0,
                 product_id,

@@ -1,10 +1,30 @@
 use std::fmt::{Debug, Formatter};
 use crate::entity::normal_distribute::NormalDistribution;
+#[derive(PartialEq,Clone,Debug)]
+pub enum ProductCategory{
+    Food ,
+    Water,
+    Clothing,
+    Entertainment
+}
+
+impl ProductCategory {
+    pub fn from_str(category: &str) -> Self {
+        match category {
+            "Food" => ProductCategory::Food,
+            "Water" => ProductCategory::Water,
+            "Clothing" => ProductCategory::Clothing,
+            "Entertainment" => ProductCategory::Entertainment,
+            _ => panic!("Invalid product category"),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct Product {
     id: u64,
     name: String,
+    product_category: ProductCategory,
     pub(crate) original_price_distribution: NormalDistribution,
     original_elastic_distribution: NormalDistribution,
     product_cost_distribution: NormalDistribution,
@@ -23,7 +43,7 @@ impl Debug for Product {
 }
 
 impl Product {
-    pub fn new(id: u64, name: String) -> Self {
+    pub fn new(id: u64, name: String, product_category: ProductCategory) -> Self {
         let original_price_distribution =
             NormalDistribution::random(id, format!("{}_price_dist", name), Some(0.0), Some(1.0));
 
@@ -36,6 +56,7 @@ impl Product {
         Product {
             id,
             name,
+            product_category,
             original_price_distribution,
             original_elastic_distribution,
             product_cost_distribution,
@@ -45,6 +66,7 @@ impl Product {
     pub fn from(
         id: u64,
         name: String,
+        product_category: ProductCategory,
         original_price_distribution: NormalDistribution,
         original_elastic_distribution: NormalDistribution,
         product_cost_distribution: NormalDistribution,
@@ -52,6 +74,7 @@ impl Product {
         Product {
             id,
             name,
+            product_category,
             original_price_distribution,
             original_elastic_distribution,
             product_cost_distribution,
@@ -88,7 +111,7 @@ mod tests {
         let id = 1;
         let name = "test_product".to_string();
 
-        let product = Product::new(id, name.clone());
+        let product = Product::new(id, name.clone(), ProductCategory::Food);
 
         assert_eq!(product.id(), id);
         assert_eq!(product.name(), name);
@@ -110,6 +133,8 @@ mod tests {
         assert_eq!(cost_dist.id(), id);
         assert!(cost_dist.name().contains(&name));
         assert!(cost_dist.mean() >= 0.0);
+
+        assert_eq!(product.product_category, ProductCategory::Food);
     }
 
     #[test]
@@ -125,6 +150,7 @@ mod tests {
         let product = Product::from(
             id,
             name.clone(),
+            ProductCategory::Food,
             price_dist.clone(),
             elastic_dist.clone(),
             cost_dist.clone(),
@@ -153,5 +179,38 @@ mod tests {
         assert_eq!(product_cost_dist.id(), cost_dist.id());
         assert_eq!(product_cost_dist.name(), cost_dist.name());
         assert_eq!(product_cost_dist.std_dev(), cost_dist.std_dev());
+
+        assert_eq!(product.product_category, ProductCategory::Food);
+    }
+
+    #[test]
+    fn test_product_category_from_str() {
+        // 测试有效的产品类别转换
+        assert_eq!(ProductCategory::from_str("Food"), ProductCategory::Food);
+        assert_eq!(ProductCategory::from_str("Water"), ProductCategory::Water);
+        assert_eq!(ProductCategory::from_str("Clothing"), ProductCategory::Clothing);
+        assert_eq!(ProductCategory::from_str("Entertainment"), ProductCategory::Entertainment);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid product category")]
+    fn test_product_category_from_str_invalid() {
+        // 测试无效的产品类别转换，应该panic
+        ProductCategory::from_str("InvalidCategory");
+    }
+
+    #[test]
+    fn test_product_category_enum_values() {
+        // 测试所有枚举值都能被正确转换
+        let categories = vec!(
+            ("Food", ProductCategory::Food),
+            ("Water", ProductCategory::Water),
+            ("Clothing", ProductCategory::Clothing),
+            ("Entertainment", ProductCategory::Entertainment),
+        );
+
+        for (category_str, expected) in categories {
+            assert_eq!(ProductCategory::from_str(category_str), expected);
+        }
     }
 }

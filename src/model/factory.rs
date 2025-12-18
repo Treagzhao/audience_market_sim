@@ -1,4 +1,4 @@
-use crate::logging::{log_factory_range_optimization, LOGGER};
+use crate::logging::{LOGGER, log_factory_range_optimization};
 use crate::model::agent::{IntervalRelation, TradeResult};
 use crate::model::product::Product;
 use crate::model::util::shift_range_by_ratio;
@@ -279,12 +279,16 @@ fn get_range_change_ratio(interval_relation: Option<IntervalRelation>) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::product::Product;
+    use crate::model::product::{Product, ProductCategory};
 
     #[test]
     fn test_new() {
         // 创建一个Product实例用于初始化Factory
-        let product = Product::new(1, "test_product".to_string());
+        let product = Product::new(
+            1,
+            "test_product".to_string(),
+            crate::model::product::ProductCategory::Food,
+        );
         let factory = Factory::new(1, "test_factory".to_string(), &product);
 
         // 验证初始化后的字段值
@@ -303,28 +307,36 @@ mod tests {
 
     #[test]
     fn test_id() {
-        let product = Product::new(1, "test_product".to_string());
+        let product = Product::new(
+            1,
+            "test_product".to_string(),
+            crate::model::product::ProductCategory::Food,
+        );
         let factory = Factory::new(42, "test_factory".to_string(), &product);
         assert_eq!(factory.id(), 42);
     }
 
     #[test]
     fn test_name() {
-        let product = Product::new(1, "test_product".to_string());
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food);
         let factory = Factory::new(1, "my_factory".to_string(), &product);
         assert_eq!(factory.name(), "my_factory");
     }
 
     #[test]
     fn test_product_id() {
-        let product = Product::new(5, "test_product".to_string());
+        let product = Product::new(
+            5,
+            "test_product".to_string(),
+            crate::model::product::ProductCategory::Food,
+        );
         let factory = Factory::new(1, "test_factory".to_string(), &product);
         assert_eq!(factory.product_id(), 5);
     }
 
     #[test]
     fn test_supply_price_range() {
-        let product = Product::new(1, "test_product".to_string());
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food);
         let factory = Factory::new(1, "test_factory".to_string(), &product);
         let (lower, upper) = factory.supply_price_range();
         assert!(lower >= 0.0);
@@ -334,7 +346,7 @@ mod tests {
     #[test]
     fn test_start_round() {
         // 创建一个Product实例用于初始化Factory
-        let product = Product::new(1, "test_product".to_string());
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food);
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
 
         // 记录初始现金和成本，用于验证产量计算
@@ -412,7 +424,7 @@ mod tests {
     #[test]
     fn test_deal() {
         // 创建一个Product实例用于初始化Factory
-        let product = Product::new(1, "test_product".to_string());
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food);
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
 
         // 手动设置一个固定的supply_price_range，便于测试
@@ -477,7 +489,7 @@ mod tests {
     #[test]
     fn test_deal_with_interval_relation() {
         // 创建一个Product实例用于初始化Factory
-        let product = Product::new(1, "test_product".to_string());
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food);
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
 
         // 手动设置一个固定的supply_price_range，便于测试
@@ -548,7 +560,7 @@ mod tests {
     #[test]
     fn test_deal_with_small_range() {
         // 测试边界情况：小范围区间
-        let product = Product::new(1, "test_product".to_string());
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food);
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
 
         // 设置一个很小的范围
@@ -568,7 +580,7 @@ mod tests {
     #[test]
     fn test_deal_with_inventory() {
         // 测试deal方法的库存逻辑
-        let product = Product::new(1, "test_product".to_string());
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food);
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
 
         // 设置初始供应价格范围
@@ -620,7 +632,7 @@ mod tests {
     #[test]
     fn test_deal_with_zero_inventory() {
         // 测试库存为0时deal方法不执行
-        let product = Product::new(1, "test_product".to_string());
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food);
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
 
         // 设置初始供应价格范围
@@ -651,7 +663,7 @@ mod tests {
     #[test]
     fn test_cash_update_after_success() {
         // 测试交易成功后cash字段的更新
-        let product = Product::new(1, "test_product".to_string());
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food);
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
 
         // 设置初始供应价格范围

@@ -1,124 +1,239 @@
-[[products]]
-id = 1
-name = "Synthetic Bread"
-mean_price = 15.0
-std_dev_price = 5.0
-mean_elastic = 0.05
-std_dev_elastic = 0.02
-mean_product_cost = 3.5      # 成本压低！这是合成糊糊，不是法式面包
-std_dev_product_cost = 0.5
+# ==========================================
+# Category 1: 食物 (Food)
+# ==========================================
 
 [[products]]
-id = 2
-name = "Filtered Water"
-mean_price = 10.0
-std_dev_price = 2.0
-mean_elastic = 0.05
-std_dev_elastic = 0.01
-mean_product_cost = 1.0      # 成本压低！这是过滤水，不是普通的水
+id = 1
+name = "合成营养膏 (Nutrient Paste)"
+category = "Food"
+mean_price = 5.0
+std_dev_price = 1.0
+mean_elastic = 0.01          # 几乎是 0，必须买
+std_dev_elastic = 0.005
+mean_product_cost = 1.5
 std_dev_product_cost = 0.2
 
 [[products]]
+id = 2
+name = "标准白面包 (White Bread)"
+category = "Food"
+mean_price = 12.0
+std_dev_price = 2.0
+mean_elastic = 0.05          # 稍微有点选择权
+std_dev_elastic = 0.01
+mean_product_cost = 3.5
+std_dev_product_cost = 0.5
+
+[[products]]
 id = 3
-name = "Basic Nutrients"
+name = "有机苹果 (Organic Apple)"
+category = "Food"
+mean_price = 25.0
+std_dev_price = 4.0
+mean_elastic = 0.30          # 嫌贵可以不吃水果
+std_dev_elastic = 0.05
+mean_product_cost = 8.0
+std_dev_product_cost = 1.0
+
+[[products]]
+id = 4
+name = "A5和牛 (Premium Steak)"
+category = "Food"
+mean_price = 150.0
+std_dev_price = 20.0
+mean_elastic = 0.85          # 极高弹性，稍微贵点就不买了
+std_dev_elastic = 0.05
+mean_product_cost = 60.0
+std_dev_product_cost = 5.0
+
+# ==========================================
+# Category 2: 水源 (Water)
+# ==========================================
+
+[[products]]
+id = 5
+name = "公共自来水 (Tap Water)"
+category = "Water"
+mean_price = 2.0
+std_dev_price = 0.5
+mean_elastic = 0.01          # 绝度刚需
+std_dev_elastic = 0.001
+mean_product_cost = 0.5
+std_dev_product_cost = 0.1
+
+[[products]]
+id = 6
+name = "过滤纯净水 (Filtered Water)"
+category = "Water"
+mean_price = 6.0
+std_dev_price = 1.0
+mean_elastic = 0.10
+std_dev_elastic = 0.02
+mean_product_cost = 1.5
+std_dev_product_cost = 0.3
+
+[[products]]
+id = 7
+name = "阿尔卑斯矿泉水 (Mineral Water)"
+category = "Water"
+mean_price = 15.0
+std_dev_price = 3.0
+mean_elastic = 0.40
+std_dev_elastic = 0.05
+mean_product_cost = 4.0
+std_dev_product_cost = 0.5
+
+[[products]]
+id = 8
+name = "维他命能量水 (Vitamin Water)"
+category = "Water"
+mean_price = 25.0
+std_dev_price = 5.0
+mean_elastic = 0.75
+std_dev_elastic = 0.05
+mean_product_cost = 8.0
+std_dev_product_cost = 1.0
+
+# ==========================================
+# Category 3: 交通 (Transport)
+# ==========================================
+
+[[products]]
+id = 9
+name = "老旧公交车票 (Bus Ticket)"
+category = "Transport"
+mean_price = 3.0
+std_dev_price = 0.5
+mean_elastic = 0.15          # 没钱只能坐这个
+std_dev_elastic = 0.02
+mean_product_cost = 1.0
+std_dev_product_cost = 0.2
+
+[[products]]
+id = 10
+name = "地铁月卡 (Subway Pass)"
+category = "Transport"
+mean_price = 10.0
+std_dev_price = 2.0
+mean_elastic = 0.25
+std_dev_elastic = 0.03
+mean_product_cost = 3.0
+std_dev_product_cost = 0.5
+
+[[products]]
+id = 11
+name = "网约车 (Taxi Ride)"
+category = "Transport"
+mean_price = 40.0
+std_dev_price = 8.0
+mean_elastic = 0.65
+std_dev_elastic = 0.05
+mean_product_cost = 15.0
+std_dev_product_cost = 2.0
+
+[[products]]
+id = 12
+name = "私人直升机 (Private Heli)"
+category = "Transport"
+mean_price = 500.0
+std_dev_price = 100.0
+mean_elastic = 0.98          # 只要有一点点不满意（或者没钱）就不买
+std_dev_elastic = 0.01
+mean_product_cost = 200.0
+std_dev_product_cost = 20.0
+
+# ==========================================
+# Category 4: 衣着 (Clothing)
+# ==========================================
+
+[[products]]
+id = 13
+name = "粗布工装 (Work Uniform)"
+category = "Clothing"
+mean_price = 20.0
+std_dev_price = 5.0
+mean_elastic = 0.20
+std_dev_elastic = 0.05
+mean_product_cost = 8.0
+std_dev_product_cost = 1.0
+
+[[products]]
+id = 14
+name = "快时尚T恤 (Fast Fashion)"
+category = "Clothing"
+mean_price = 50.0
+std_dev_price = 10.0
+mean_elastic = 0.50
+std_dev_elastic = 0.05
+mean_product_cost = 15.0
+std_dev_product_cost = 2.0
+
+[[products]]
+id = 15
+name = "羊毛大衣 (Wool Coat)"
+category = "Clothing"
+mean_price = 200.0
+std_dev_price = 30.0
+mean_elastic = 0.80
+std_dev_elastic = 0.05
+mean_product_cost = 80.0
+std_dev_product_cost = 10.0
+
+[[products]]
+id = 16
+name = "高定礼服 (Designer Suit)"
+category = "Clothing"
+mean_price = 1000.0
+std_dev_price = 200.0
+mean_elastic = 0.95
+std_dev_elastic = 0.02
+mean_product_cost = 300.0
+std_dev_product_cost = 50.0
+
+# ==========================================
+# Category 5: 娱乐 (Entertainment)
+# ==========================================
+
+[[products]]
+id = 17
+name = "黑白报纸 (Newspaper)"
+category = "Entertainment"
+mean_price = 2.0
+std_dev_price = 0.5
+mean_elastic = 0.30          # 娱乐里的最低门槛
+std_dev_elastic = 0.05
+mean_product_cost = 0.5
+std_dev_product_cost = 0.1
+
+[[products]]
+id = 18
+name = "电影票 (Movie Ticket)"
+category = "Entertainment"
 mean_price = 30.0
 std_dev_price = 5.0
-mean_elastic = 0.58        # 稍微比水和面包“非必需”一点点，但也仅仅是一点点
-std_dev_elastic = 0.03
-mean_product_cost = 7.0    # 成本较高，这是高科技合成蛋白块
-std_dev_product_cost = 1.5
-#[[products]]
-#id = 4
-#name = "Generic Meds"
-#mean_price = 50.0
-#std_dev_price = 10.0
-#mean_elastic = 0.10
-#std_dev_elastic = 0.05
-#
-#[[products]]
-#id = 5
-#name = "Low-end Clothing"
-#mean_price = 80.0
-#std_dev_price = 20.0
-#mean_elastic = 0.15
-#std_dev_elastic = 0.05
-#
-#[[products]]
-#id = 6
-#name = "Public Transport Pass"
-#mean_price = 150.0
-#std_dev_price = 30.0
-#mean_elastic = 0.20
-#std_dev_elastic = 0.10
-#
-#[[products]]
-#id = 7
-#name = "Standard Dataplan"
-#mean_price = 200.0
-#std_dev_price = 40.0
-#mean_elastic = 0.30
-#std_dev_elastic = 0.10
-#
-#[[products]]
-#id = 8
-#name = "Processed Meat"
-#mean_price = 300.0
-#std_dev_price = 50.0
-#mean_elastic = 0.35
-#std_dev_elastic = 0.15
-#
-#[[products]]
-#id = 9
-#name = "Household Appliance"
-#mean_price = 500.0
-#std_dev_price = 100.0
-#mean_elastic = 0.40
-#std_dev_elastic = 0.20
-#
-#[[products]]
-#id = 10
-#name = "Personal Computer"
-#mean_price = 1500.0
-#std_dev_price = 300.0
-#mean_elastic = 0.60
-#std_dev_elastic = 0.15
-#
-#[[products]]
-#id = 11
-#name = "Private Vehicle Lease"
-#mean_price = 2500.0
-#std_dev_price = 500.0
-#mean_elastic = 0.70
-#std_dev_elastic = 0.10
-#
-#[[products]]
-#id = 12
-#name = "Organic Whole Food"
-#mean_price = 1200.0
-#std_dev_price = 200.0
-#mean_elastic = 0.65
-#std_dev_elastic = 0.20
-#
-#[[products]]
-#id = 13
-#name = "Real Estate Token"
-#mean_price = 6000.0
-#std_dev_price = 1000.0
-#mean_elastic = 0.85
-#std_dev_elastic = 0.10
-#
-#[[products]]
-#id = 14
-#name = "Neural Implant Upgrade"
-#mean_price = 8000.0
-#std_dev_price = 1500.0
-#mean_elastic = 0.90
-#std_dev_elastic = 0.05
-#
-#[[products]]
-#id = 15
-#name = "Orbital Trip Ticket"
-#mean_price = 10000.0
-#std_dev_price = 2000.0
-#mean_elastic = 0.95
-#std_dev_elastic = 0.02
+mean_elastic = 0.70
+std_dev_elastic = 0.05
+mean_product_cost = 5.0
+std_dev_product_cost = 1.0
+
+[[products]]
+id = 19
+name = "VR游戏机 (VR Console)"
+category = "Entertainment"
+mean_price = 300.0
+std_dev_price = 50.0
+mean_elastic = 0.90
+std_dev_elastic = 0.05
+mean_product_cost = 120.0
+std_dev_product_cost = 15.0
+
+[[products]]
+id = 20
+name = "太空旅行 (Space Tour)"
+category = "Entertainment"  # 已从 product_category 修正为 category
+mean_price = 5000.0
+std_dev_price = 1000.0
+mean_elastic = 0.99          # 只要价格稍微不对劲，甚至哪怕对劲了，只要没闲钱就不买
+std_dev_elastic = 0.005
+mean_product_cost = 2000.0
+std_dev_product_cost = 200.0

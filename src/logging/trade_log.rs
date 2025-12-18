@@ -34,18 +34,18 @@ pub struct TradeLog {
 
 impl TradeLog {
     pub fn new(
-        timestamp:i64,
+        timestamp: i64,
         round: u64,
         trade_id: u64,
         task_id: String,
         agent_id: u64,
         agent_name: String,
         agent_cash: f64,
-        agent_pref_original_price:f64,
-        agent_pref_original_elastic:f64,
-        agent_pref_current_price:f64,
-        agent_pref_current_range_lower:f64,
-        agent_pref_current_range_upper:f64,
+        agent_pref_original_price: f64,
+        agent_pref_original_elastic: f64,
+        agent_pref_current_price: f64,
+        agent_pref_current_range_lower: f64,
+        agent_pref_current_range_upper: f64,
         factory: &Factory,
         product: &Product,
         trade_result: &TradeResult,
@@ -74,7 +74,7 @@ impl TradeLog {
             product_name: product.name().to_string(),
             trade_result: result_str.to_string(),
             interval_relation: interval_relation.to_string(),
-            price:price.unwrap_or(-1.0),
+            price: price.unwrap_or(-1.0),
             factory_supply_range_lower: lower,
             factory_supply_range_upper: upper,
             factory_stock: factory.get_stock(round),
@@ -88,18 +88,18 @@ impl TradeLog {
 }
 
 pub fn log_trade(
-    timestamp:i64,
+    timestamp: i64,
     round: u64,
     trade_id: u64,
     task_id: String,
     agent_id: u64,
     agent_name: String,
     agent_cash: f64,
-    agent_pref_original_price:f64,
-    agent_pref_original_elastic:f64,
-    agent_pref_current_price:f64,
-    agent_pref_current_range_lower:f64,
-    agent_pref_current_range_upper:f64,
+    agent_pref_original_price: f64,
+    agent_pref_original_elastic: f64,
+    agent_pref_current_price: f64,
+    agent_pref_current_range_lower: f64,
+    agent_pref_current_range_upper: f64,
     factory: &Factory,
     product: &Product,
     trade_result: &TradeResult,
@@ -172,7 +172,7 @@ mod tests {
     use super::*;
     use crate::model::agent::Agent;
     use crate::model::factory::Factory;
-    use crate::model::product::Product;
+    use crate::model::product::{Product, ProductCategory};
     use parking_lot::RwLock;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -191,7 +191,7 @@ mod tests {
         let trade_result = TradeResult::Success(95.5);
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string());
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -200,14 +200,14 @@ mod tests {
             round,
             trade_id,
             task_id.clone(),
-            1, // agent_id
+            1,                       // agent_id
             "TestAgent".to_string(), // agent_name
-            1000.0, // agent_cash
-            100.0, // agent_pref_original_price
-            0.5, // agent_pref_original_elastic
-            98.0, // agent_pref_current_price
-            90.0, // agent_pref_current_range_lower
-            110.0, // agent_pref_current_range_upper
+            1000.0,                  // agent_cash
+            100.0,                   // agent_pref_original_price
+            0.5,                     // agent_pref_original_elastic
+            98.0,                    // agent_pref_current_price
+            90.0,                    // agent_pref_current_range_lower
+            110.0,                   // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
@@ -246,7 +246,7 @@ mod tests {
         let trade_result = TradeResult::Failed;
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string());
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -255,14 +255,14 @@ mod tests {
             round,
             trade_id,
             task_id.clone(),
-            1, // agent_id
+            1,                       // agent_id
             "TestAgent".to_string(), // agent_name
-            1000.0, // agent_cash
-            100.0, // agent_pref_original_price
-            0.5, // agent_pref_original_elastic
-            98.0, // agent_pref_current_price
-            90.0, // agent_pref_current_range_lower
-            110.0, // agent_pref_current_range_upper
+            1000.0,                  // agent_cash
+            100.0,                   // agent_pref_original_price
+            0.5,                     // agent_pref_original_elastic
+            98.0,                    // agent_pref_current_price
+            90.0,                    // agent_pref_current_range_lower
+            110.0,                   // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
@@ -288,7 +288,7 @@ mod tests {
         let trade_result = TradeResult::NotMatched;
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string());
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -297,14 +297,14 @@ mod tests {
             round,
             trade_id,
             task_id.clone(),
-            1, // agent_id
+            1,                       // agent_id
             "TestAgent".to_string(), // agent_name
-            1000.0, // agent_cash
-            100.0, // agent_pref_original_price
-            0.5, // agent_pref_original_elastic
-            98.0, // agent_pref_current_price
-            90.0, // agent_pref_current_range_lower
-            110.0, // agent_pref_current_range_upper
+            1000.0,                  // agent_cash
+            100.0,                   // agent_pref_original_price
+            0.5,                     // agent_pref_original_elastic
+            98.0,                    // agent_pref_current_price
+            90.0,                    // agent_pref_current_range_lower
+            110.0,                   // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
@@ -329,7 +329,7 @@ mod tests {
         let trade_result = TradeResult::Success(95.5);
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string());
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -338,14 +338,14 @@ mod tests {
             round,
             trade_id,
             task_id.clone(),
-            1, // agent_id
+            1,                       // agent_id
             "TestAgent".to_string(), // agent_name
-            1000.0, // agent_cash
-            100.0, // agent_pref_original_price
-            0.5, // agent_pref_original_elastic
-            98.0, // agent_pref_current_price
-            90.0, // agent_pref_current_range_lower
-            110.0, // agent_pref_current_range_upper
+            1000.0,                  // agent_cash
+            100.0,                   // agent_pref_original_price
+            0.5,                     // agent_pref_original_elastic
+            98.0,                    // agent_pref_current_price
+            90.0,                    // agent_pref_current_range_lower
+            110.0,                   // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
@@ -395,7 +395,7 @@ mod tests {
         let trade_result = TradeResult::Failed;
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string());
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -404,14 +404,14 @@ mod tests {
             round,
             trade_id,
             task_id.clone(),
-            1, // agent_id
+            1,                       // agent_id
             "TestAgent".to_string(), // agent_name
-            1000.0, // agent_cash
-            100.0, // agent_pref_original_price
-            0.5, // agent_pref_original_elastic
-            98.0, // agent_pref_current_price
-            90.0, // agent_pref_current_range_lower
-            110.0, // agent_pref_current_range_upper
+            1000.0,                  // agent_cash
+            100.0,                   // agent_pref_original_price
+            0.5,                     // agent_pref_original_elastic
+            98.0,                    // agent_pref_current_price
+            90.0,                    // agent_pref_current_range_lower
+            110.0,                   // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
@@ -444,7 +444,7 @@ mod tests {
         let trade_result = TradeResult::NotMatched;
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string());
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -453,14 +453,14 @@ mod tests {
             round,
             trade_id,
             task_id.clone(),
-            1, // agent_id
+            1,                       // agent_id
             "TestAgent".to_string(), // agent_name
-            1000.0, // agent_cash
-            100.0, // agent_pref_original_price
-            0.5, // agent_pref_original_elastic
-            98.0, // agent_pref_current_price
-            90.0, // agent_pref_current_range_lower
-            110.0, // agent_pref_current_range_upper
+            1000.0,                  // agent_cash
+            100.0,                   // agent_pref_original_price
+            0.5,                     // agent_pref_original_elastic
+            98.0,                    // agent_pref_current_price
+            90.0,                    // agent_pref_current_range_lower
+            110.0,                   // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,
@@ -487,7 +487,7 @@ mod tests {
         let trade_result = TradeResult::NotYet;
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string());
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -496,14 +496,14 @@ mod tests {
             round,
             trade_id,
             task_id.clone(),
-            1, // agent_id
+            1,                       // agent_id
             "TestAgent".to_string(), // agent_name
-            1000.0, // agent_cash
-            100.0, // agent_pref_original_price
-            0.5, // agent_pref_original_elastic
-            98.0, // agent_pref_current_price
-            90.0, // agent_pref_current_range_lower
-            110.0, // agent_pref_current_range_upper
+            1000.0,                  // agent_cash
+            100.0,                   // agent_pref_original_price
+            0.5,                     // agent_pref_original_elastic
+            98.0,                    // agent_pref_current_price
+            90.0,                    // agent_pref_current_range_lower
+            110.0,                   // agent_pref_current_range_upper
             &factory,
             &product,
             &trade_result,

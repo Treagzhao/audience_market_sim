@@ -11,6 +11,7 @@ use std::io::Read;
 use std::thread;
 use std::time::Duration;
 use toml::Value;
+use crate::model::product::ProductCategory;
 
 /// 从config.toml文件初始化产品列表
 fn init_products() -> Vec<crate::model::product::Product> {
@@ -69,6 +70,11 @@ fn init_products() -> Vec<crate::model::product::Product> {
             .get("std_dev_product_cost")
             .and_then(Value::as_float)
             .expect("Failed to get std_dev_product_cost");
+        let product_category = product_value
+            .get("category")
+            .and_then(Value::as_str)
+            .expect("Failed to get product_category")
+            .to_string();
 
         // 创建价格分布
         let price_distribution = NormalDistribution::new(
@@ -98,6 +104,7 @@ fn init_products() -> Vec<crate::model::product::Product> {
         let product = crate::model::product::Product::from(
             id,
             name,
+            ProductCategory::from_str(&product_category),
             price_distribution,
             elastic_distribution,
             product_cost_distribution,
