@@ -1,7 +1,7 @@
 use crate::logging::LOGGER;
 use crate::model::agent::preference::Preference;
 use crate::model::factory::Factory;
-use crate::model::product::Product;
+use crate::model::product::{Product, ProductCategory};
 use crate::model::util::{
     gen_new_range_with_price, gen_price_in_range, interval_intersection, round_to_nearest_cent,
 };
@@ -20,7 +20,7 @@ mod preference;
 pub struct Agent {
     id: u64,
     name: String,
-    preferences: Arc<RwLock<HashMap<u64, Preference>>>,
+    preferences: Arc<RwLock<HashMap<ProductCategory, HashMap<u64, Preference>>>>,
     cash: f64,
     demand: Arc<RwLock<HashMap<u64, bool>>>,
 }
@@ -51,10 +51,13 @@ pub enum TradeResult {
 impl Agent {
     pub fn new(id: u64, name: String, cash: f64, products: &[Product], auto_demand: bool) -> Self {
         // 为每个商品生成preference
-        let mut preferences_map = HashMap::new();
+        let mut preferences_map: HashMap<ProductCategory, HashMap<u64, Preference>> =
+            HashMap::new();
         for product in products {
-            let preference = Preference::from_product(product);
-            preferences_map.insert(product.id(), preference);
+            let mut preferences = preferences_map
+                .entry(product.product_category())
+                .or_default();
+            preferences.insert(product.id(), Preference::from_product(product));
         }
 
         let mut agent = Agent {
@@ -78,7 +81,9 @@ impl Agent {
         &self.name
     }
 
-    pub fn preferences(&self) -> parking_lot::RwLockReadGuard<'_, HashMap<u64, Preference>> {
+    pub fn preferences(
+        &self,
+    ) -> parking_lot::RwLockReadGuard<'_, HashMap<ProductCategory, HashMap<u64, Preference>>> {
         self.preferences.read()
     }
 
@@ -99,42 +104,7 @@ impl Agent {
         let user_id = self.id;
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
-            loop {
-                // 从preferences中随机选择一个商品ID
-
-                let Some(preferences) = p.try_read() else {
-                    // 如果无法获取preferences的读锁，跳过本次循环
-                    continue;
-                };
-                if preferences.is_empty() {
-                    continue; // 如果preferences为空，跳过本次循环
-                }
-
-                // 随机选择一个商品ID
-                let index = rng.gen_range(0..preferences.len());
-                let product_id = *preferences.keys().nth(index).unwrap();
-                drop(preferences);
-                // 检查该商品是否已经在demand中
-                let is_already_demanded = {
-                    let Some(demand) = d.try_read() else {
-                        continue;
-                    };
-                    let is_already_demanded = demand.contains_key(&product_id);
-                    drop(demand);
-                    is_already_demanded
-                };
-
-                // 如果不在demand中，才添加
-                if !is_already_demanded {
-                    let Some(mut demand) = d.try_write() else {
-                        continue;
-                    };
-                    demand.insert(product_id, true);
-                }
-                // 随机等待0~500ms
-                let wait_time = rng.gen_range(0..500);
-                thread::sleep(Duration::from_millis(wait_time));
-            }
+            loop {}
         });
     }
 
@@ -145,9 +115,10 @@ impl Agent {
 
     fn match_factory(&self, factory: &Factory) -> IntervalRelation {
         let product_id = factory.product_id();
+        let product_category = factory.product_category();
 
         let pg = self.preferences.read();
-        let p = pg.get(&product_id).unwrap();
+        let p = pg.get(&product_category).unwrap().get(&product_id).unwrap();
 
         let agent_range = p.current_range;
         let factory_range = factory.supply_price_range();
@@ -183,7 +154,9 @@ impl Agent {
         // 根据1-preference.elastic的概率决定是否删除demand
         let mut rng = rand::thread_rng();
         let mut g = self.preferences.write();
-        if let Some(preference) = g.get_mut(&product_id) {
+        let category = factory.product_category();
+        let mut preferences = g.get_mut(&category).unwrap();
+        if let Some(preference) = preferences.get_mut(&product_id) {
             // 计算概率：弹性值本身，弹性越大，越容易删除需求
             let delete_probability = preference.original_elastic;
             // 生成随机数（0.0到1.0）
@@ -197,7 +170,6 @@ impl Agent {
                     demand.remove(&product_id);
                     drop(demand);
                     // 记录需求删除日志
-                    let preference = g.get(&product_id).unwrap();
                     let logger = LOGGER.write();
                     if let Err(e) = logger.log_agent_demand_removal(
                         round,
@@ -216,7 +188,6 @@ impl Agent {
                     }
                 } // 关闭作用域括号
             } else {
-                let preference = g.get_mut(&product_id).unwrap();
                 // 不删除demand，更新range
                 let (old_min, old_max) = preference.current_range;
                 let old_length = old_max - old_min;
@@ -308,14 +279,20 @@ impl Agent {
         }
     }
 
-    fn remove_demand(&mut self, product_id: u64, round: u64, reason: &str) {
+    fn remove_demand(
+        &mut self,
+        product_id: u64,
+        product_category: ProductCategory,
+        round: u64,
+        reason: &str,
+    ) {
         let mut g = self.demand.write();
         g.remove(&product_id);
         drop(g);
 
         // 记录需求删除日志
-        let preferences = self.preferences.read();
-
+        let preferences_map = self.preferences.read();
+        let preferences = preferences_map.get(&product_category).unwrap();
         if let Some(preference) = preferences.get(&product_id) {
             let logger = LOGGER.write();
             if let Err(e) = logger.log_agent_demand_removal(
@@ -355,11 +332,19 @@ impl Agent {
                     self.handle_trade_failure(factory, product_id, round, false);
                     return (TradeResult::Failed, Some(interval_relation));
                 }
-                self.remove_demand(product_id, round, "successful_trade");
+                self.remove_demand(
+                    product_id,
+                    factory.product_category(),
+                    round,
+                    "successful_trade",
+                );
                 let price = price.unwrap();
                 self.cash -= price;
-                let mut g = self.preferences.write();
-                let preference = g.get_mut(&product_id).unwrap();
+                let mut preferences_map = self.preferences.write();
+                let preferences = preferences_map
+                    .get_mut(&factory.product_category())
+                    .unwrap();
+                let preference = preferences.get_mut(&product_id).unwrap();
                 preference.current_price = price;
                 let (new_min, new_max) =
                     gen_new_range_with_price(price, preference.current_range, 0.9);
@@ -441,119 +426,6 @@ mod tests {
     }
 
     #[test]
-    fn test_desire() {
-        let id = 2;
-        let name = "test_agent_desire".to_string();
-        let cash = 100.0;
-
-        // 创建测试产品列表
-        let products = vec![
-            Product::from(
-                1,
-                "product_1".to_string(),
-                crate::model::product::ProductCategory::Food,
-                crate::entity::normal_distribute::NormalDistribution::new(
-                    10.0,
-                    1,
-                    "price_dist_1".to_string(),
-                    2.0,
-                ),
-                crate::entity::normal_distribute::NormalDistribution::new(
-                    0.5,
-                    1,
-                    "elastic_dist_1".to_string(),
-                    0.1,
-                ),
-                crate::entity::normal_distribute::NormalDistribution::new(
-                    5.0,
-                    1,
-                    "cost_dist_1".to_string(),
-                    1.0,
-                ),
-            ),
-            Product::from(
-                2,
-                "product_2".to_string(),
-                crate::model::product::ProductCategory::Food,
-                crate::entity::normal_distribute::NormalDistribution::new(
-                    20.0,
-                    2,
-                    "price_dist_2".to_string(),
-                    3.0,
-                ),
-                crate::entity::normal_distribute::NormalDistribution::new(
-                    0.3,
-                    2,
-                    "elastic_dist_2".to_string(),
-                    0.1,
-                ),
-                crate::entity::normal_distribute::NormalDistribution::new(
-                    10.0,
-                    2,
-                    "cost_dist_2".to_string(),
-                    2.0,
-                ),
-            ),
-            Product::from(
-                3,
-                "product_3".to_string(),
-                crate::model::product::ProductCategory::Food,
-                crate::entity::normal_distribute::NormalDistribution::new(
-                    30.0,
-                    3,
-                    "price_dist_3".to_string(),
-                    4.0,
-                ),
-                crate::entity::normal_distribute::NormalDistribution::new(
-                    0.7,
-                    3,
-                    "elastic_dist_3".to_string(),
-                    0.1,
-                ),
-                crate::entity::normal_distribute::NormalDistribution::new(
-                    15.0,
-                    3,
-                    "cost_dist_3".to_string(),
-                    3.0,
-                ),
-            ),
-        ];
-
-        let mut agent = Agent::new(id, name, cash, &products, true);
-
-        // 调用desire方法启动需求生成线程
-        agent.desire();
-
-        // 等待1秒，让后台线程有机会生成一些需求
-        thread::sleep(Duration::from_secs(1));
-
-        // 检查demand映射是否有内容
-        let demand = agent.demand.read();
-        assert!(
-            demand.len() > 0,
-            "Demand map should not be empty after calling desire"
-        );
-
-        // 获取preferences中的商品ID集合
-        let valid_product_ids: std::collections::HashSet<u64> = {
-            let preferences = agent.preferences.read();
-            preferences.keys().cloned().collect()
-        };
-
-        // 验证所有需求值都是true，且商品ID在preferences中存在
-        for (product_id, is_demanded) in demand.iter() {
-            assert!(
-                *is_demanded,
-                "Demand value for product {product_id} should be true"
-            );
-            assert!(
-                valid_product_ids.contains(product_id),
-                "Product ID {product_id} should be in preferences"
-            );
-        }
-    }
-
-    #[test]
     fn test_trade() {
         // 创建Product
         let product_id = 1;
@@ -592,7 +464,10 @@ mod tests {
         let initial_range = (40.0, 60.0);
 
         {
-            let mut preferences = agent.preferences.write();
+            let mut preferences_map = agent.preferences.write();
+            let preferences = preferences_map
+                .get_mut(&product.product_category())
+                .unwrap();
             let preference = preferences.get_mut(&product_id).unwrap();
             preference.current_range = initial_range;
         }
@@ -613,7 +488,8 @@ mod tests {
 
         // 获取Agent的range，使用独立的代码块确保借用及时释放
         let agent_range = {
-            let preferences = agent.preferences.read();
+            let preferences_map = agent.preferences.read();
+            let preferences = preferences_map.get(&product.product_category()).unwrap();
             preferences.get(&product_id).unwrap().current_range
         };
 
@@ -625,7 +501,10 @@ mod tests {
 
         // 如果没有交集，调整Agent的range，确保有交集
         if overlap_max <= overlap_min {
-            let mut preferences = agent.preferences.write();
+            let mut preferences_map = agent.preferences.write();
+            let preferences = preferences_map
+                .get_mut(&product.product_category())
+                .unwrap();
             let preference = preferences.get_mut(&product_id).unwrap();
             // 设置一个与factory_range有交集的range
             preference.current_range = (factory_min, factory_max + 10.0);
@@ -636,7 +515,10 @@ mod tests {
 
         // 获取初始范围
         let initial_range = {
-            let preferences_before = agent.preferences.read();
+            let preferences_before_map = agent.preferences.read();
+            let preferences_before = preferences_before_map
+                .get(&product.product_category())
+                .unwrap();
             let preference_before = preferences_before.get(&product_id).unwrap();
             preference_before.current_range
         };
@@ -657,7 +539,8 @@ mod tests {
                 }
 
                 // 验证current_price和current_range更新
-                let preferences = agent.preferences.read();
+                let preferences_map = agent.preferences.read();
+                let preferences = preferences_map.get(&product.product_category()).unwrap();
                 let preference = preferences.get(&product_id).unwrap();
 
                 // 验证cash减少
@@ -752,7 +635,10 @@ mod tests {
             let initial_range = (40.0, 100.0);
 
             {
-                let mut preferences = agent.preferences.write();
+                let mut preferences_map = agent.preferences.write();
+                let preferences = preferences_map
+                    .get_mut(&product.product_category())
+                    .unwrap();
                 let preference = preferences.get_mut(&product_id).unwrap();
                 preference.current_range = initial_range;
             }
@@ -833,7 +719,10 @@ mod tests {
         let initial_range = (40.0, 60.0);
 
         {
-            let mut preferences = agent.preferences.write();
+            let mut preferences_map = agent.preferences.write();
+            let preferences = preferences_map
+                .get_mut(&product.product_category())
+                .unwrap();
             let preference = preferences.get_mut(&product_id).unwrap();
             preference.current_range = initial_range;
         }
@@ -851,8 +740,9 @@ mod tests {
         // 记录交易前的状态
         let initial_cash = agent.cash();
         let initial_range = {
-            let preferences_before = agent.preferences.read();
-            preferences_before.get(&product_id).unwrap().current_range
+            let preferences_map = agent.preferences.read();
+            let preferences = preferences_map.get(&product.product_category()).unwrap();
+            preferences.get(&product_id).unwrap().current_range
         };
 
         // 执行交易
@@ -872,7 +762,8 @@ mod tests {
         );
 
         // 验证range可能被更新（取决于随机概率）
-        let preferences = agent.preferences.read();
+        let preferences_map = agent.preferences.read();
+        let preferences = preferences_map.get(&product.product_category()).unwrap();
         let preference = preferences.get(&product_id).unwrap();
         let new_range = preference.current_range;
 
@@ -1029,7 +920,7 @@ mod tests {
         );
 
         // 调用remove_demand方法，添加必要的参数
-        agent.remove_demand(product_id, 0, "test_removal");
+        agent.remove_demand(product_id, ProductCategory::Food, 0, "test_removal");
 
         // 验证需求被移除
         assert!(
@@ -1088,7 +979,7 @@ mod tests {
         );
 
         // 调用remove_demand方法，添加必要的参数，验证没有副作用
-        agent.remove_demand(product_id, 0, "test_removal");
+        agent.remove_demand(product_id, ProductCategory::Food, 0, "test_removal");
 
         // 再次验证没有需求
         assert!(

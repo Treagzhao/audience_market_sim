@@ -1,6 +1,6 @@
 use crate::logging::{LOGGER, log_factory_range_optimization};
 use crate::model::agent::{IntervalRelation, TradeResult};
-use crate::model::product::Product;
+use crate::model::product::{Product, ProductCategory};
 use crate::model::util::shift_range_by_ratio;
 use log::debug;
 use rand::Rng;
@@ -11,6 +11,7 @@ pub struct Factory {
     id: u64,
     name: String,
     product_id: u64,
+    product_category: ProductCategory,
     supply_price_range: (f64, f64),
     amount: HashMap<u64, i16>,
     product_cost: f64,
@@ -51,6 +52,7 @@ impl Factory {
             id,
             name,
             product_id: product.id(),
+            product_category: product.product_category(),
             supply_price_range: (lower, upper),
             amount: HashMap::new(),
             u64_list: LinkedList::new(),
@@ -75,6 +77,9 @@ impl Factory {
 
     pub fn product_id(&self) -> u64 {
         self.product_id
+    }
+    pub fn product_category(&self) -> ProductCategory {
+        self.product_category.clone()
     }
 
     pub fn supply_price_range(&self) -> (f64, f64) {
@@ -931,5 +936,16 @@ mod tests {
         // 预期结果：下界等于min_cost，上界为min_cost + 90.0
         assert_eq!(result.0, min_cost);
         assert_eq!(result.1, min_cost + 90.0);
+    }
+
+    #[test]
+    fn test_factory_product_category() {
+        let factory = Factory::new(
+            1,
+            "Test Factory".to_string(),
+            &Product::new(1,  "aaaa".to_string(),ProductCategory::Food),
+        );
+
+        assert_eq!(factory.product_category(), ProductCategory::Food);
     }
 }
