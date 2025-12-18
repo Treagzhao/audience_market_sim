@@ -9,6 +9,7 @@ CREATE TABLE factory_end_of_round_logs (
     factory_id BIGINT INVERTED INDEX,               -- 工厂ID
     factory_name STRING,             -- 工厂名称
     product_id BIGINT INVERTED INDEX,               -- 产品ID
+    product_category STRING INVERTED INDEX,         -- 产品类别
     
     -- 字段（数值型数据，用于聚合分析）
     cash DOUBLE NOT NULL,            -- 工厂现金

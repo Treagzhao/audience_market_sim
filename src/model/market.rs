@@ -1,3 +1,4 @@
+use crate::logging::LOGGER;
 use crate::model::agent::{Agent, TradeResult};
 use crate::model::factory::Factory;
 use crate::model::product::Product;
@@ -10,7 +11,6 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::logging::LOGGER;
 
 pub struct Market {
     factories: HashMap<u64, Arc<RwLock<Vec<Factory>>>>,
@@ -50,7 +50,7 @@ impl Market {
             let agent = Agent::new(
                 agent_id,
                 format!("Consumer_{}", agent_id),
-                1000.0,
+                10000.0,
                 &products,
                 true,
             );
@@ -106,7 +106,14 @@ impl Market {
                 let mut counter = round_trades.clone();
                 let h = thread::spawn(move || {
                     println!("dealing product :{:?}", product_id);
-                    let count = process_product_trades(current_timestamp,products, f_list, agents, round, product_id);
+                    let count = process_product_trades(
+                        current_timestamp,
+                        products,
+                        f_list,
+                        agents,
+                        round,
+                        product_id,
+                    );
                     let mut c = counter.write();
                     *c += count;
                 });
@@ -173,6 +180,7 @@ impl Market {
                             factory.id(),
                             factory.name().to_string(),
                             product_id,
+                            format!("{:?}", factory.product_category()),
                             factory.cash(),
                             initial_stock,
                             remaining_stock,
@@ -190,7 +198,7 @@ impl Market {
                 let agents = self.agents.write();
                 agents.iter().all(|agent| {
                     let mut a = agent.write();
-                    a.income((500.0, 600.0));
+                    a.income((800.0, 1200.0));
                     a.cash() < 0.01
                 })
             };
@@ -221,7 +229,7 @@ impl Market {
 
 /// 处理单个商品的交易逻辑（线程安全版本）
 fn process_product_trades(
-    timestamp:i64,
+    timestamp: i64,
     products: Vec<Product>,
     factories: Arc<RwLock<Vec<Factory>>>,
     agents: Arc<RwLock<Vec<Arc<RwLock<Agent>>>>>,
@@ -257,7 +265,11 @@ fn process_product_trades(
 
             // 获取agents的可变锁
             let mut agents = agents_clone.read();
-            println!("current dealing product :{:?} factory_id:{:?}",product_id,factory.id());
+            println!(
+                "current dealing product :{:?} factory_id:{:?}",
+                product_id,
+                factory.id()
+            );
             // 让每个agent与工厂进行交易
             for a in agents.iter() {
                 let (agent_id, agent_name) = {
@@ -304,14 +316,28 @@ fn process_product_trades(
                 if matches!(trade_result, crate::model::agent::TradeResult::Success(_)) {
                     local_count += 1;
                 }
-                let (agent_cash,agent_pref_original_price,agent_pref_original_elastic,agent_pref_current_price,agent_pref_current_range_lower,agent_pref_current_range_upper) = {
+                let (
+                    agent_cash,
+                    agent_pref_original_price,
+                    agent_pref_original_elastic,
+                    agent_pref_current_price,
+                    agent_pref_current_range_lower,
+                    agent_pref_current_range_upper,
+                ) = {
                     let agent = a.read();
                     let preferences_map = agent.preferences();
                     let preferences = preferences_map.get(&product.product_category()).unwrap();
                     if let Some(x) = preferences.get(&product_id) {
-                        (agent.cash(),x.original_price,x.original_elastic,x.current_price,x.current_range.0,x.current_range.1)
+                        (
+                            agent.cash(),
+                            x.original_price,
+                            x.original_elastic,
+                            x.current_price,
+                            x.current_range.0,
+                            x.current_range.1,
+                        )
                     } else {
-                        (agent.cash(),0.0,0.0,0.0,0.0,0.0)
+                        (agent.cash(), 0.0, 0.0, 0.0, 0.0, 0.0)
                     }
                 };
                 // 记录交易日志

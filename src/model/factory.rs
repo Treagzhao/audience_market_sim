@@ -159,6 +159,7 @@ impl Factory {
                     self.id(),
                     self.name().to_string(),
                     self.product_id(),
+                    format!("{:?}", self.product_category),
                     (lower, upper),
                     (new_lower, new_upper),
                     lower_change,
@@ -193,6 +194,7 @@ impl Factory {
                     self.id(),
                     self.name().to_string(),
                     self.product_id(),
+                    format!("{:?}", self.product_category),
                     (lower, upper),
                     (new_lower, new_upper),
                     lower_change,
@@ -943,7 +945,7 @@ mod tests {
         let factory = Factory::new(
             1,
             "Test Factory".to_string(),
-            &Product::new(1,  "aaaa".to_string(),ProductCategory::Food),
+            &Product::new(1, "aaaa".to_string(), ProductCategory::Food),
         );
 
         assert_eq!(factory.product_category(), ProductCategory::Food);
