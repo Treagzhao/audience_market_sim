@@ -1,10 +1,11 @@
 use std::fmt::{Debug, Formatter};
 use crate::entity::normal_distribute::NormalDistribution;
-#[derive(PartialEq,Clone,Debug)]
+#[derive(PartialEq,Clone,Debug,Hash,Eq,Copy)]
 pub enum ProductCategory{
     Food ,
     Water,
     Clothing,
+    Transport,
     Entertainment
 }
 
@@ -14,6 +15,7 @@ impl ProductCategory {
             "Food" => ProductCategory::Food,
             "Water" => ProductCategory::Water,
             "Clothing" => ProductCategory::Clothing,
+            "Transport" => ProductCategory::Transport,
             "Entertainment" => ProductCategory::Entertainment,
             _ => panic!("Invalid product category"),
         }
@@ -63,6 +65,9 @@ impl Product {
         }
     }
 
+    pub fn product_category(&self) -> ProductCategory {
+        self.product_category.clone()
+    }
     pub fn from(
         id: u64,
         name: String,
@@ -212,5 +217,11 @@ mod tests {
         for (category_str, expected) in categories {
             assert_eq!(ProductCategory::from_str(category_str), expected);
         }
+    }
+
+    #[test]
+    fn test_product_category_product_category() {
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food);
+        assert_eq!(product.product_category(), ProductCategory::Food);
     }
 }

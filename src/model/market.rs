@@ -306,9 +306,9 @@ fn process_product_trades(
                 }
                 let (agent_cash,agent_pref_original_price,agent_pref_original_elastic,agent_pref_current_price,agent_pref_current_range_lower,agent_pref_current_range_upper) = {
                     let agent = a.read();
-                    let g = agent.preferences();
-                    let preferences = g.get(&product_id);
-                    if let Some(x) = preferences {
+                    let preferences_map = agent.preferences();
+                    let preferences = preferences_map.get(&product.product_category()).unwrap();
+                    if let Some(x) = preferences.get(&product_id) {
                         (agent.cash(),x.original_price,x.original_elastic,x.current_price,x.current_range.0,x.current_range.1)
                     } else {
                         (agent.cash(),0.0,0.0,0.0,0.0,0.0)
