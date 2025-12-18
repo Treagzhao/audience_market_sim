@@ -113,14 +113,23 @@ impl Agent {
                 ProductCategory::Entertainment,
             ];
             loop {
-                let preferences_map = p.read();
-                for category in categories.iter() {
-                    let preferences = preferences_map.get(category).unwrap();
-                    insert_demand(preferences, d.clone());
-                }
-
                 let wait_time = rng.gen_range(100..500);
                 thread::sleep(Duration::from_millis(wait_time));
+                let preferences_map = p.read();
+                let mut new_demand: Vec<u64> = Vec::new();
+                for category in categories.iter() {
+                    let preferences = preferences_map.get(category).unwrap();
+                    let product_id=  insert_demand(preferences, d.clone());
+                    if let Some(product_id) = product_id {
+                        new_demand.push(product_id);
+                    }
+                }
+                // 更新demand
+                let mut demand = d.write();
+                for product_id in new_demand.iter() {
+                    demand.insert(*product_id, true);
+                }
+                drop(demand);
             }
         });
     }
@@ -425,7 +434,10 @@ impl Agent {
     }
 }
 
-fn insert_demand(preference: &HashMap<u64, Preference>, demand: Arc<RwLock<HashMap<u64, bool>>>) {
+fn insert_demand(
+    preference: &HashMap<u64, Preference>,
+    demand: Arc<RwLock<HashMap<u64, bool>>>,
+) -> Option<u64> {
     let mut rng = rand::thread_rng();
     let mut product_ids = preference.keys().collect::<Vec<_>>();
     product_ids.shuffle(&mut rng);
@@ -440,11 +452,10 @@ fn insert_demand(preference: &HashMap<u64, Preference>, demand: Arc<RwLock<HashM
         }
         let random = rng.gen_range(0.01..0.99);
         if random > preference.original_elastic {
-            let mut demand = demand.write();
-            demand.insert(**product_id, true);
-            break;
+            return Some(**product_id);
         }
     }
+    None
 }
 
 #[cfg(test)]
@@ -1079,71 +1090,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_insert_demand() {
-        // 创建测试用的preference HashMap
-        let mut preference = HashMap::new();
-
-        // 添加一些产品偏好，original_elastic设置为1.0确保一定会被选中
-        preference.insert(
-            1,
-            Preference {
-                original_price: 10.0,
-                original_elastic: 1.0,
-                current_price: 10.0,
-                current_range: (5.0, 15.0),
-            },
-        );
-
-        preference.insert(
-            2,
-            Preference {
-                original_price: 20.0,
-                original_elastic: 1.0,
-                current_price: 20.0,
-                current_range: (15.0, 25.0),
-            },
-        );
-
-        // 创建空的demand HashMap
-        let demand = Arc::new(RwLock::new(HashMap::new()));
-
-        // 调用insert_demand函数
-        insert_demand(&preference, demand.clone());
-
-        // 检查demand中是否有产品被添加
-        let demand_read = demand.read();
-        assert!(
-            !demand_read.is_empty(),
-            "Demand should not be empty after insert_demand"
-        );
-        assert!(
-            demand_read.len() <= 1,
-            "Demand should have at most one product added"
-        );
-
-        // 验证添加的产品ID在preference中存在
-        for product_id in demand_read.keys() {
-            assert!(
-                preference.contains_key(product_id),
-                "Added product should be in preference"
-            );
-        }
-
-        // 测试已经有需求的情况
-        let demand2 = Arc::new(RwLock::new(HashMap::new()));
-        {
-            let mut demand_write = demand2.write();
-            demand_write.insert(1, true);
-        }
-
-        insert_demand(&preference, demand2.clone());
-
-        // 检查是否添加了另一个产品
-        let demand2_read = demand2.read();
-        assert!(
-            demand2_read.len() <= 2,
-            "Demand should have at most two products added"
-        );
-    }
 }

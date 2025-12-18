@@ -553,7 +553,6 @@ mod tests {
                 "Result should be Some when cash is sufficient"
             );
             let price = result.unwrap();
-            println!("price:{:?} string:{:?}", price, format!("{:.20}", price));
             // 验证价格是两位小数
             let decimal_places = format!("{:.20}", price)
                 .split('.')

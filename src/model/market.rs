@@ -236,7 +236,6 @@ fn process_product_trades(
     round: u64,
     product_id: u64,
 ) -> u64 {
-    println!("dealing:{:?}", product_id);
     let mut trades_count = 0;
     let p = products.iter().find(|p| p.id() == product_id);
     if p.is_none() {
@@ -265,11 +264,6 @@ fn process_product_trades(
 
             // 获取agents的可变锁
             let mut agents = agents_clone.read();
-            println!(
-                "current dealing product :{:?} factory_id:{:?}",
-                product_id,
-                factory.id()
-            );
             // 让每个agent与工厂进行交易
             for a in agents.iter() {
                 let (agent_id, agent_name) = {
