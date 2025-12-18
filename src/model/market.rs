@@ -190,7 +190,7 @@ impl Market {
                 let agents = self.agents.write();
                 agents.iter().all(|agent| {
                     let mut a = agent.write();
-                    a.income((100.0, 150.0));
+                    a.income((500.0, 600.0));
                     a.cash() < 0.01
                 })
             };
