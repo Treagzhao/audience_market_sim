@@ -9,6 +9,7 @@ use log::debug;
 use mysql::prelude::{TextQuery, WithParams};
 use parking_lot::RwLock;
 use rand::Rng;
+use rand::prelude::SliceRandom;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
@@ -104,7 +105,23 @@ impl Agent {
         let user_id = self.id;
         thread::spawn(move || {
             let mut rng = rand::thread_rng();
-            loop {}
+            let categories = vec![
+                ProductCategory::Food,
+                ProductCategory::Clothing,
+                ProductCategory::Transport,
+                ProductCategory::Water,
+                ProductCategory::Entertainment,
+            ];
+            loop {
+                let preferences_map = p.read();
+                for category in categories.iter() {
+                    let preferences = preferences_map.get(category).unwrap();
+                    insert_demand(preferences, d.clone());
+                }
+
+                let wait_time = rng.gen_range(0..100);
+                thread::sleep(Duration::from_millis(wait_time));
+            }
         });
     }
 
@@ -402,6 +419,28 @@ impl Agent {
                 self.handle_trade_failure(factory, product_id, round, false);
                 return (TradeResult::Failed, Some(interval_relation));
             }
+        }
+    }
+}
+
+fn insert_demand(preference: &HashMap<u64, Preference>, demand: Arc<RwLock<HashMap<u64, bool>>>) {
+    let mut rng = rand::thread_rng();
+    let mut product_ids = preference.keys().collect::<Vec<_>>();
+    product_ids.shuffle(&mut rng);
+    for product_id in product_ids.iter() {
+        let preference = preference.get(product_id).unwrap();
+        let is_already_demanded = {
+            let demand = demand.read();
+            demand.contains_key(&product_id)
+        };
+        if is_already_demanded {
+            continue;
+        }
+        let random = rng.gen_range(0.01..0.99);
+        if random < preference.original_elastic {
+            let mut demand = demand.write();
+            demand.insert(**product_id, true);
+            break;
         }
     }
 }
@@ -1035,6 +1074,74 @@ mod tests {
         assert!(
             new_cash > current_cash,
             "Cash should increase after second income"
+        );
+    }
+
+    #[test]
+    fn test_insert_demand() {
+        // 创建测试用的preference HashMap
+        let mut preference = HashMap::new();
+
+        // 添加一些产品偏好，original_elastic设置为1.0确保一定会被选中
+        preference.insert(
+            1,
+            Preference {
+                original_price: 10.0,
+                original_elastic: 1.0,
+                current_price: 10.0,
+                current_range: (5.0, 15.0),
+            },
+        );
+
+        preference.insert(
+            2,
+            Preference {
+                original_price: 20.0,
+                original_elastic: 1.0,
+                current_price: 20.0,
+                current_range: (15.0, 25.0),
+            },
+        );
+
+        // 创建空的demand HashMap
+        let demand = Arc::new(RwLock::new(HashMap::new()));
+
+        // 调用insert_demand函数
+        insert_demand(&preference, demand.clone());
+
+        // 检查demand中是否有产品被添加
+        let demand_read = demand.read();
+        assert!(
+            !demand_read.is_empty(),
+            "Demand should not be empty after insert_demand"
+        );
+        assert!(
+            demand_read.len() <= 1,
+            "Demand should have at most one product added"
+        );
+
+        // 验证添加的产品ID在preference中存在
+        for product_id in demand_read.keys() {
+            assert!(
+                preference.contains_key(product_id),
+                "Added product should be in preference"
+            );
+        }
+
+        // 测试已经有需求的情况
+        let demand2 = Arc::new(RwLock::new(HashMap::new()));
+        {
+            let mut demand_write = demand2.write();
+            demand_write.insert(1, true);
+        }
+
+        insert_demand(&preference, demand2.clone());
+
+        // 检查是否添加了另一个产品
+        let demand2_read = demand2.read();
+        assert!(
+            demand2_read.len() <= 2,
+            "Demand should have at most two products added"
         );
     }
 }
