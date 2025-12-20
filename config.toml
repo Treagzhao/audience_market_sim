@@ -1,5 +1,5 @@
 # ==========================================
-# Category 1: 食物 (Food)
+# Category 1: 食物 (Food) - 普遍低耐久
 # ==========================================
 
 [[products]]
@@ -8,10 +8,11 @@ name = "合成营养膏 (Nutrient Paste)"
 category = "Food"
 mean_price = 5.0
 std_dev_price = 1.0
-mean_elastic = 0.01          # 几乎是 0，必须买
+mean_elastic = 0.01
 std_dev_elastic = 0.005
 mean_product_cost = 1.5
 std_dev_product_cost = 0.2
+durability = 0.50          # 加工食品，保质期中等
 
 [[products]]
 id = 2
@@ -19,10 +20,11 @@ name = "标准白面包 (White Bread)"
 category = "Food"
 mean_price = 12.0
 std_dev_price = 2.0
-mean_elastic = 0.05          # 稍微有点选择权
+mean_elastic = 0.05
 std_dev_elastic = 0.01
 mean_product_cost = 3.5
 std_dev_product_cost = 0.5
+durability = 0.20          # 极易腐烂
 
 [[products]]
 id = 3
@@ -30,10 +32,11 @@ name = "有机苹果 (Organic Apple)"
 category = "Food"
 mean_price = 25.0
 std_dev_price = 4.0
-mean_elastic = 0.30          # 嫌贵可以不吃水果
+mean_elastic = 0.30
 std_dev_elastic = 0.05
 mean_product_cost = 8.0
 std_dev_product_cost = 1.0
+durability = 0.30          # 生鲜，保质期短
 
 [[products]]
 id = 4
@@ -41,13 +44,14 @@ name = "A5和牛 (Premium Steak)"
 category = "Food"
 mean_price = 150.0
 std_dev_price = 20.0
-mean_elastic = 0.85          # 极高弹性，稍微贵点就不买了
+mean_elastic = 0.85
 std_dev_elastic = 0.05
 mean_product_cost = 60.0
 std_dev_product_cost = 5.0
+durability = 0.10          # 顶级生鲜，对储藏要求极高，极易腐坏
 
 # ==========================================
-# Category 2: 水源 (Water)
+# Category 2: 水源 (Water) - 较高耐久
 # ==========================================
 
 [[products]]
@@ -56,10 +60,11 @@ name = "公共自来水 (Tap Water)"
 category = "Water"
 mean_price = 2.0
 std_dev_price = 0.5
-mean_elastic = 0.01          # 绝度刚需
+mean_elastic = 0.01
 std_dev_elastic = 0.001
 mean_product_cost = 0.5
 std_dev_product_cost = 0.1
+durability = 0.99          # 只要管网在，几乎不腐坏
 
 [[products]]
 id = 6
@@ -71,6 +76,7 @@ mean_elastic = 0.10
 std_dev_elastic = 0.02
 mean_product_cost = 1.5
 std_dev_product_cost = 0.3
+durability = 0.95          # 瓶装水，耐久极高
 
 [[products]]
 id = 7
@@ -82,6 +88,7 @@ mean_elastic = 0.40
 std_dev_elastic = 0.05
 mean_product_cost = 4.0
 std_dev_product_cost = 0.5
+durability = 0.95
 
 [[products]]
 id = 8
@@ -93,9 +100,10 @@ mean_elastic = 0.75
 std_dev_elastic = 0.05
 mean_product_cost = 8.0
 std_dev_product_cost = 1.0
+durability = 0.85          # 添加剂可能会随时间降解
 
 # ==========================================
-# Category 3: 交通 (Transport)
+# Category 3: 交通 (Transport) - 耐久度为 0 (服务型)
 # ==========================================
 
 [[products]]
@@ -104,10 +112,11 @@ name = "老旧公交车票 (Bus Ticket)"
 category = "Transport"
 mean_price = 3.0
 std_dev_price = 0.5
-mean_elastic = 0.15          # 没钱只能坐这个
+mean_elastic = 0.15
 std_dev_elastic = 0.02
 mean_product_cost = 1.0
 std_dev_product_cost = 0.2
+durability = 0.0           # 这一班车没坐，库存直接归零
 
 [[products]]
 id = 10
@@ -119,6 +128,7 @@ mean_elastic = 0.25
 std_dev_elastic = 0.03
 mean_product_cost = 3.0
 std_dev_product_cost = 0.5
+durability = 0.0           # 票务服务不具备实物存货性
 
 [[products]]
 id = 11
@@ -130,6 +140,7 @@ mean_elastic = 0.65
 std_dev_elastic = 0.05
 mean_product_cost = 15.0
 std_dev_product_cost = 2.0
+durability = 0.0
 
 [[products]]
 id = 12
@@ -137,13 +148,14 @@ name = "私人直升机 (Private Heli)"
 category = "Transport"
 mean_price = 500.0
 std_dev_price = 100.0
-mean_elastic = 0.98          # 只要有一点点不满意（或者没钱）就不买
+mean_elastic = 0.98
 std_dev_elastic = 0.01
 mean_product_cost = 200.0
 std_dev_product_cost = 20.0
+durability = 0.0           # 飞行小时是即时消耗的
 
 # ==========================================
-# Category 4: 衣着 (Clothing)
+# Category 4: 衣着 (Clothing) - 极高耐久 (耐用品)
 # ==========================================
 
 [[products]]
@@ -156,6 +168,7 @@ mean_elastic = 0.20
 std_dev_elastic = 0.05
 mean_product_cost = 8.0
 std_dev_product_cost = 1.0
+durability = 0.98          # 很难穿坏，存货也不怕放
 
 [[products]]
 id = 14
@@ -167,6 +180,7 @@ mean_elastic = 0.50
 std_dev_elastic = 0.05
 mean_product_cost = 15.0
 std_dev_product_cost = 2.0
+durability = 0.70          # 质量较差，且有“过时”的无形腐坏
 
 [[products]]
 id = 15
@@ -178,6 +192,7 @@ mean_elastic = 0.80
 std_dev_elastic = 0.05
 mean_product_cost = 80.0
 std_dev_product_cost = 10.0
+durability = 0.95          # 只要不被虫蛀，存放很久
 
 [[products]]
 id = 16
@@ -189,9 +204,10 @@ mean_elastic = 0.95
 std_dev_elastic = 0.02
 mean_product_cost = 300.0
 std_dev_product_cost = 50.0
+durability = 0.99          # 极好的保存工艺
 
 # ==========================================
-# Category 5: 娱乐 (Entertainment)
+# Category 5: 娱乐 (Entertainment) - 混合
 # ==========================================
 
 [[products]]
@@ -200,10 +216,11 @@ name = "黑白报纸 (Newspaper)"
 category = "Entertainment"
 mean_price = 2.0
 std_dev_price = 0.5
-mean_elastic = 0.30          # 娱乐里的最低门槛
+mean_elastic = 0.30
 std_dev_elastic = 0.05
 mean_product_cost = 0.5
 std_dev_product_cost = 0.1
+durability = 0.1           # 昨天的报纸没人买，信息瞬时腐烂
 
 [[products]]
 id = 18
@@ -215,6 +232,7 @@ mean_elastic = 0.70
 std_dev_elastic = 0.05
 mean_product_cost = 5.0
 std_dev_product_cost = 1.0
+durability = 0.0           # 过期作废
 
 [[products]]
 id = 19
@@ -226,14 +244,16 @@ mean_elastic = 0.90
 std_dev_elastic = 0.05
 mean_product_cost = 120.0
 std_dev_product_cost = 15.0
+durability = 0.90          # 电子产品
 
 [[products]]
 id = 20
 name = "太空旅行 (Space Tour)"
-category = "Entertainment"  # 已从 product_category 修正为 category
+category = "Entertainment"
 mean_price = 5000.0
 std_dev_price = 1000.0
-mean_elastic = 0.99          # 只要价格稍微不对劲，甚至哪怕对劲了，只要没闲钱就不买
+mean_elastic = 0.99
 std_dev_elastic = 0.005
 mean_product_cost = 2000.0
 std_dev_product_cost = 200.0
+durability = 0.0           # 顶级服务，不可储存

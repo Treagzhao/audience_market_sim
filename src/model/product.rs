@@ -1,12 +1,12 @@
-use std::fmt::{Debug, Formatter};
 use crate::entity::normal_distribute::NormalDistribution;
-#[derive(PartialEq,Clone,Debug,Hash,Eq,Copy)]
-pub enum ProductCategory{
-    Food ,
+use std::fmt::{Debug, Formatter};
+#[derive(PartialEq, Clone, Debug, Hash, Eq, Copy)]
+pub enum ProductCategory {
+    Food,
     Water,
     Clothing,
     Transport,
-    Entertainment
+    Entertainment,
 }
 
 impl ProductCategory {
@@ -30,6 +30,7 @@ pub struct Product {
     pub(crate) original_price_distribution: NormalDistribution,
     original_elastic_distribution: NormalDistribution,
     product_cost_distribution: NormalDistribution,
+    durability: f64,
 }
 
 impl Debug for Product {
@@ -37,15 +38,21 @@ impl Debug for Product {
         f.debug_struct("Product")
             .field("id", &self.id)
             .field("name", &self.name)
-            .field("original_price_distribution", &self.original_price_distribution)
-            .field("original_elastic_distribution", &self.original_elastic_distribution)
+            .field(
+                "original_price_distribution",
+                &self.original_price_distribution,
+            )
+            .field(
+                "original_elastic_distribution",
+                &self.original_elastic_distribution,
+            )
             .field("product_cost_distribution", &self.product_cost_distribution)
             .finish()
     }
 }
 
 impl Product {
-    pub fn new(id: u64, name: String, product_category: ProductCategory) -> Self {
+    pub fn new(id: u64, name: String, product_category: ProductCategory, durability: f64) -> Self {
         let original_price_distribution =
             NormalDistribution::random(id, format!("{}_price_dist", name), Some(0.0), Some(1.0));
 
@@ -58,11 +65,16 @@ impl Product {
         Product {
             id,
             name,
+            durability,
             product_category,
             original_price_distribution,
             original_elastic_distribution,
             product_cost_distribution,
         }
+    }
+
+    pub fn durability(&self) -> f64 {
+        self.durability
     }
 
     pub fn product_category(&self) -> ProductCategory {
@@ -72,6 +84,7 @@ impl Product {
         id: u64,
         name: String,
         product_category: ProductCategory,
+        durability: f64,
         original_price_distribution: NormalDistribution,
         original_elastic_distribution: NormalDistribution,
         product_cost_distribution: NormalDistribution,
@@ -79,6 +92,7 @@ impl Product {
         Product {
             id,
             name,
+            durability,
             product_category,
             original_price_distribution,
             original_elastic_distribution,
@@ -109,6 +123,7 @@ impl Product {
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_relative_eq;
     use super::*;
 
     #[test]
@@ -116,7 +131,7 @@ mod tests {
         let id = 1;
         let name = "test_product".to_string();
 
-        let product = Product::new(id, name.clone(), ProductCategory::Food);
+        let product = Product::new(id, name.clone(), ProductCategory::Food, 1.0);
 
         assert_eq!(product.id(), id);
         assert_eq!(product.name(), name);
@@ -156,6 +171,7 @@ mod tests {
             id,
             name.clone(),
             ProductCategory::Food,
+            1.0,
             price_dist.clone(),
             elastic_dist.clone(),
             cost_dist.clone(),
@@ -193,8 +209,14 @@ mod tests {
         // 测试有效的产品类别转换
         assert_eq!(ProductCategory::from_str("Food"), ProductCategory::Food);
         assert_eq!(ProductCategory::from_str("Water"), ProductCategory::Water);
-        assert_eq!(ProductCategory::from_str("Clothing"), ProductCategory::Clothing);
-        assert_eq!(ProductCategory::from_str("Entertainment"), ProductCategory::Entertainment);
+        assert_eq!(
+            ProductCategory::from_str("Clothing"),
+            ProductCategory::Clothing
+        );
+        assert_eq!(
+            ProductCategory::from_str("Entertainment"),
+            ProductCategory::Entertainment
+        );
     }
 
     #[test]
@@ -207,12 +229,12 @@ mod tests {
     #[test]
     fn test_product_category_enum_values() {
         // 测试所有枚举值都能被正确转换
-        let categories = vec!(
+        let categories = vec![
             ("Food", ProductCategory::Food),
             ("Water", ProductCategory::Water),
             ("Clothing", ProductCategory::Clothing),
             ("Entertainment", ProductCategory::Entertainment),
-        );
+        ];
 
         for (category_str, expected) in categories {
             assert_eq!(ProductCategory::from_str(category_str), expected);
@@ -221,7 +243,13 @@ mod tests {
 
     #[test]
     fn test_product_category_product_category() {
-        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food);
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food, 1.0);
         assert_eq!(product.product_category(), ProductCategory::Food);
+    }
+
+    #[test]
+    fn test_product_durability() {
+        let product = Product::new(1, "test_product".to_string(), ProductCategory::Food, 0.88);
+        assert_relative_eq!(product.durability(), 0.88);
     }
 }

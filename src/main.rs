@@ -91,6 +91,11 @@ fn init_products() -> Vec<crate::model::product::Product> {
             format!("{}_elastic_dist", name),
             std_dev_elastic,
         );
+        // 提取durability属性
+        let durability = product_value
+            .get("durability")
+            .and_then(Value::as_float)
+            .expect("Failed to get durability") as f64;
 
         // 创建成本分布
         let product_cost_distribution = NormalDistribution::new(
@@ -105,6 +110,7 @@ fn init_products() -> Vec<crate::model::product::Product> {
             id,
             name,
             ProductCategory::from_str(&product_category),
+            durability,
             price_distribution,
             elastic_distribution,
             product_cost_distribution,
