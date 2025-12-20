@@ -119,7 +119,7 @@ impl Agent {
                 let mut new_demand: Vec<u64> = Vec::new();
                 for category in categories.iter() {
                     let preferences = preferences_map.get(category).unwrap();
-                    let product_id=  insert_demand(preferences, d.clone());
+                    let product_id = insert_demand(preferences, d.clone());
                     if let Some(product_id) = product_id {
                         new_demand.push(product_id);
                     }
@@ -485,6 +485,7 @@ mod tests {
             product_id,
             "test_product".to_string(),
             crate::model::product::ProductCategory::Food,
+            1.0,
             crate::entity::normal_distribute::NormalDistribution::new(
                 50.0,
                 product_id,
@@ -623,8 +624,7 @@ mod tests {
                 let midpoint = (new_min + new_max) / 2.0;
                 assert!(
                     (midpoint - preference.current_price).abs() < 0.001,
-                    "Range should be centered at trade price (midpoint: {}, price: {})
-",
+                    "Range should be centered at trade price (midpoint: {}, price: {})",
                     midpoint,
                     preference.current_price
                 );
@@ -659,6 +659,7 @@ mod tests {
                 product_id,
                 "test_product".to_string(),
                 crate::model::product::ProductCategory::Food,
+                1.0,
                 crate::entity::normal_distribute::NormalDistribution::new(
                     60.0,
                     product_id,
@@ -743,6 +744,7 @@ mod tests {
             product_id,
             "test_product".to_string(),
             crate::model::product::ProductCategory::Food,
+            1.0,
             crate::entity::normal_distribute::NormalDistribution::new(
                 50.0,
                 product_id,
@@ -833,6 +835,7 @@ mod tests {
             product_id,
             "test_product".to_string(),
             crate::model::product::ProductCategory::Food, // 添加缺失的product_category参数
+            1.0,
             crate::entity::normal_distribute::NormalDistribution::new(
                 10.0,
                 product_id,
@@ -882,6 +885,7 @@ mod tests {
             product_id,
             "test_product".to_string(),
             crate::model::product::ProductCategory::Food, // 添加缺失的product_category参数
+            1.0,
             crate::entity::normal_distribute::NormalDistribution::new(
                 10.0,
                 product_id,
@@ -930,7 +934,8 @@ mod tests {
         let product = crate::model::product::Product::from(
             product_id,
             "test_product".to_string(),
-            crate::model::product::ProductCategory::Food, // 添加缺失的product_category参数
+            crate::model::product::ProductCategory::Food,
+            1.0,
             crate::entity::normal_distribute::NormalDistribution::new(
                 10.0,
                 product_id,
@@ -990,6 +995,7 @@ mod tests {
             product_id,
             "test_product".to_string(),
             crate::model::product::ProductCategory::Food,
+            1.0,
             crate::entity::normal_distribute::NormalDistribution::new(
                 10.0,
                 product_id,
@@ -1089,5 +1095,4 @@ mod tests {
             "Cash should increase after second income"
         );
     }
-
 }

@@ -23,6 +23,7 @@ parking_lot = { version = "0.12.5", features = ["deadlock_detection", "serde"] }
 # Serde相关依赖
 serde = { version = "1.0.228", optional = true }
 serde_json = { version = "1.0.145", optional = true }
+approx = "0.5.1"
 
 [features]
 serde = ["dep:serde", "dep:serde_json"]

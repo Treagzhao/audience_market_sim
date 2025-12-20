@@ -195,7 +195,7 @@ mod tests {
         let trade_result = TradeResult::Success(95.5);
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food, 1.0);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -250,7 +250,7 @@ mod tests {
         let trade_result = TradeResult::Failed;
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food, 1.0);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -292,7 +292,7 @@ mod tests {
         let trade_result = TradeResult::NotMatched;
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food, 1.0);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -333,7 +333,7 @@ mod tests {
         let trade_result = TradeResult::Success(95.5);
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food, 1.0);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -399,7 +399,7 @@ mod tests {
         let trade_result = TradeResult::Failed;
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food, 1.0);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -448,7 +448,7 @@ mod tests {
         let trade_result = TradeResult::NotMatched;
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food, 1.0);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
@@ -491,7 +491,7 @@ mod tests {
         let trade_result = TradeResult::NotYet;
 
         // 创建测试用的Product
-        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food);
+        let product = Product::new(1, "TestProduct".to_string(), ProductCategory::Food, 1.0);
         // 创建测试用的Factory，使用正确的参数
         let factory = Factory::new(1, "TestFactory".to_string(), &product);
 
