@@ -25,7 +25,7 @@ pub struct TradeLog {
     pub price: f64,
     pub factory_supply_range_lower: f64,
     pub factory_supply_range_upper: f64,
-    pub factory_stock: i16,
+    pub factory_stock: u16,
     pub agent_pref_original_price: f64,
     pub agent_pref_original_elastic: f64,
     pub agent_pref_current_price: f64,

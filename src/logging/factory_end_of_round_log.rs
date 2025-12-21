@@ -8,8 +8,8 @@ pub struct FactoryEndOfRoundLog {
     pub product_id: u64,
     pub product_category: String,
     pub cash: f64,
-    pub initial_stock: i16,
-    pub remaining_stock: i16,
+    pub initial_stock: u16,
+    pub remaining_stock: u16,
     pub supply_range_lower: f64,
     pub supply_range_upper: f64,
 }
@@ -24,8 +24,8 @@ impl FactoryEndOfRoundLog {
         product_id: u64,
         product_category: String,
         cash: f64,
-        initial_stock: i16,
-        remaining_stock: i16,
+        initial_stock: u16,
+        remaining_stock: u16,
         supply_range_lower: f64,
         supply_range_upper: f64,
     ) -> Self {
@@ -77,8 +77,8 @@ pub fn log_factory_end_of_round(
     product_id: u64,
     product_category: String,
     cash: f64,
-    initial_stock: i16,
-    remaining_stock: i16,
+    initial_stock: u16,
+    remaining_stock: u16,
     supply_range_lower: f64,
     supply_range_upper: f64,
 ) -> String {

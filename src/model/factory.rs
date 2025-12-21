@@ -4,9 +4,10 @@ mod financial_bill;
 use crate::logging::{LOGGER, log_factory_range_optimization};
 use crate::model::agent::{IntervalRelation, TradeResult};
 use crate::model::factory::accountant::Accountant;
+use crate::model::factory::financial_bill::FinancialBill;
 use crate::model::product::{Product, ProductCategory};
 use crate::model::util::shift_range_by_ratio;
-use log::debug;
+use std::borrow::BorrowMut;
 use rand::Rng;
 use std::collections::{HashMap, LinkedList};
 
@@ -17,13 +18,13 @@ pub struct Factory {
     accountant: Accountant,
     product_category: ProductCategory,
     supply_price_range: (f64, f64),
-    amount: HashMap<u64, i16>,
-    remaining_stock: i16,
+    amount: HashMap<u64, u16>,
+    remaining_stock: u16,
     durability: f64,
     product_cost: f64,
     u64_list: LinkedList<u64>,
     cash: f64,
-    initial_stock: i16,
+    initial_stock: u16,
     risk_appetite: f64,
 }
 
@@ -95,12 +96,13 @@ impl Factory {
         self.supply_price_range
     }
 
-    pub fn get_stock(&self, round: u64) -> i16 {
+    pub fn get_stock(&self, round: u64) -> u16 {
         *self.amount.get(&round).unwrap_or(&10) // 默认库存为10
     }
 
     /// 开始新一轮
     pub fn start_round(&mut self, round: u64) {
+        //todo start_round里需要给bill设置 cash 和 initial_stock + product_cost;
         let last_round_initial_stock = self.initial_stock;
         let last_round_remaining_stock = self.remaining_stock;
         let last_sales = last_round_initial_stock - last_round_remaining_stock;
@@ -108,12 +110,12 @@ impl Factory {
             1
         } else if last_round_remaining_stock == 0 {
             let rate = 1.1 + 0.4 * self.risk_appetite;
-            (last_round_initial_stock as f64 * rate) as i16
+            (last_round_initial_stock as f64 * rate) as u16
         } else {
             (last_sales - last_round_remaining_stock).max(0)
         };
 
-        let production_under_budget = (self.cash * self.risk_appetite / self.product_cost) as i16;
+        let production_under_budget = (self.cash * self.risk_appetite / self.product_cost) as u16;
         let need_production = prediction_production.min(production_under_budget);
 
         self.initial_stock = last_round_remaining_stock + need_production;
@@ -136,7 +138,7 @@ impl Factory {
         }
     }
 
-    pub fn get_initial_stock(&self) -> i16 {
+    pub fn get_initial_stock(&self) -> u16 {
         self.initial_stock
     }
     pub fn deal(
@@ -238,9 +240,22 @@ impl Factory {
     }
 
     pub fn settling_after_round(&mut self, round: u64) {
+        let mut b = self.accountant.get_bill_or_default(round);
+        let mut bill = b.write();
         let remaining_stock = self.amount.get(&round).unwrap_or(&0);
-        let remaining_stock_next_round = (*remaining_stock as f64 * self.durability) as i16;
-        self.remaining_stock = remaining_stock_next_round;
+        println!("initial_stock :{:?} remaining_stock :{:?}",bill.initial_stock,remaining_stock);
+        let rot_stock = (*remaining_stock as f64 * (1.0 - self.durability)) as u16;
+        let sales_amount = (bill.initial_stock - remaining_stock).max(0);
+        bill.set_rot_stock(rot_stock);
+        bill.set_units_sold(sales_amount);
+        println!("bill.cash :{:?} self.cash:{:?}",bill.cash,self.cash);
+        let revenue =   bill.cash - self.cash;
+        bill.set_revenue(revenue);
+        bill.set_cash(self.cash);
+        bill.set_remaining_stock(*remaining_stock - rot_stock);
+        let units_gone = bill.units_sold + bill.rot_stock;
+        let cost_of_goods_gone = units_gone as f64 * self.product_cost;
+        bill.set_profit(revenue - cost_of_goods_gone);
     }
 }
 
@@ -309,6 +324,7 @@ fn get_range_change_ratio(interval_relation: Option<IntervalRelation>) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use crate::entity::normal_distribute::NormalDistribution;
     use super::*;
     use crate::model::product::{Product, ProductCategory};
 
@@ -410,8 +426,8 @@ mod tests {
 
         // 验证产量在上一轮initial_stock的1.1~1.5倍之间
         let last_initial_stock = 100;
-        let expected_min = (last_initial_stock as f64 * 1.1) as i16;
-        let expected_max = (last_initial_stock as f64 * 1.5) as i16;
+        let expected_min = (last_initial_stock as f64 * 1.1) as u16;
+        let expected_max = (last_initial_stock as f64 * 1.5) as u16;
         assert!(
             *actual_production >= expected_min,
             "Branch 2: When stock is sold out, production should be at least 1.1x last initial stock"
@@ -1010,5 +1026,46 @@ mod tests {
         );
 
         assert_eq!(factory.product_category(), ProductCategory::Food);
+    }
+
+    #[test]
+    fn test_factory_setting_after_round() {
+        let product =  Product::from(
+            1,
+            "aaaa".to_string(),
+            ProductCategory::Food,
+            0.5,
+            NormalDistribution::random(1, "aaaa_price_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "aaaa_elastic_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "aaaa_cost_dist".to_string(), Some(0.0), Some(1.0)),
+        );
+
+        let mut factory = Factory::new(
+            1,
+            "Test Factory".to_string(),
+            &product,
+        );
+        {
+            let mut b = factory.accountant.get_bill_or_default(1);
+            let mut bill = b.write();
+            bill.set_cash(100.0);
+            bill.set_initial_stock(10);
+            bill.set_production_cost(20.0);
+        }
+
+        let mut stocks =  factory.amount.entry(1).or_insert(0);
+        *stocks = 6;
+        factory.cash = 51.0;
+        factory.settling_after_round(1);
+        let b = factory.accountant.get_bill_or_default(1);
+        let bill = b.read();
+
+        assert_eq!(bill.cash, 51.0);
+        assert_eq!(bill.revenue, 49.0);
+        assert_eq!(bill.initial_stock, 10);
+        assert_eq!(bill.remaining_stock, 3);
+        assert_eq!(bill.units_sold, 4);
+        assert_eq!(bill.rot_stock, 3);
+        assert_eq!(bill.profit,49.0 - (3.0 + 4.0) * factory.product_cost);
     }
 }
