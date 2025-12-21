@@ -76,12 +76,67 @@ impl Market {
         agents.shuffle(&mut rng);
     }
 
+    fn set_agent_log_after_round(&mut self, round: u64, timestamp: i64, total_trades: u64) {
+        let agents = self.agents.read();
+        for agent in agents.iter() {
+            let a = agent.read();
+            let mut logger = LOGGER.write();
+            if let Err(e) = logger.log_agent_cash(
+                timestamp,
+                round,
+                a.id(),
+                a.name().to_string(),
+                a.cash(),
+                total_trades,
+            ) {
+                eprintln!("Failed to log agent cash: {}", e);
+            }
+        }
+    }
+
+    fn factory_log_after_round(&mut self, round: u64, timestamp: i64, total_trades: u64) {
+        for (_product_id, factory_list_arc) in self.factories.iter() {
+            let factory_list = factory_list_arc.read();
+            for factory in factory_list.iter() {
+                let product_id = factory.product_id();
+                let (supply_range_lower, supply_range_upper) = factory.supply_price_range();
+                // 获取本轮开始时的初始产量
+                let initial_stock = factory.get_initial_stock();
+                // 获取本轮结束时的剩余库存（经过交易后的库存）
+                let remaining_stock = factory.get_stock(round);
+                let mut logger = LOGGER.write();
+                if let Err(e) = logger.log_factory_end_of_round(
+                    timestamp,
+                    round,
+                    factory.id(),
+                    factory.name().to_string(),
+                    product_id,
+                    format!("{:?}", factory.product_category()),
+                    factory.cash(),
+                    initial_stock,
+                    remaining_stock,
+                    supply_range_lower,
+                    supply_range_upper,
+                ) {
+                    eprintln!("Failed to log factory end of round: {}", e);
+                }
+            }
+        }
+    }
+
+    fn ubi(&mut self)  {
+        let mut agents = self.agents.write();
+        agents.iter_mut().for_each(|agent| {
+            let mut a = agent.write();
+            a.income((800.0, 1200.0));
+        });
+    }
+
 
     pub fn run(&mut self) {
         let mut rng = rand::thread_rng();
         let mut round = 1;
         let mut total_trades = 0;
-
 
         loop {
             println!("Starting round {}, Total trades: {}", round, total_trades);
@@ -140,106 +195,45 @@ impl Market {
                 self.consecutive_zero_trades = 0;
             }
 
-            // 记录每个agent的现金情况
-            {
-                // 生成一个共享的timestamp，确保同一轮的所有log_cash事件使用同一个时间戳
-                let timestamp = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .expect("Failed to get system time")
-                    .as_millis() as i64;
+            self.set_agent_log_after_round(round, current_timestamp, total_trades);
+            self.factory_log_after_round(round, current_timestamp, total_trades);
 
-                let agents = self.agents.read();
-                for agent in agents.iter() {
-                    let a = agent.read();
-                    let mut logger = LOGGER.write();
-                    if let Err(e) = logger.log_agent_cash(
-                        timestamp,
-                        round,
-                        a.id(),
-                        a.name().to_string(),
-                        a.cash(),
-                        total_trades,
-                    ) {
-                        eprintln!("Failed to log agent cash: {}", e);
-                    }
-                }
-
-                // 记录每个工厂的轮次结束日志，使用与agent现金日志相同的timestamp
-                for (_product_id, factory_list_arc) in self.factories.iter() {
-                    let factory_list = factory_list_arc.read();
-                    for factory in factory_list.iter() {
-                        let product_id = factory.product_id();
-                        let (supply_range_lower, supply_range_upper) = factory.supply_price_range();
-                        // 获取本轮开始时的初始产量
-                        let initial_stock = factory.get_initial_stock();
-                        // 获取本轮结束时的剩余库存（经过交易后的库存）
-                        let remaining_stock = factory.get_stock(round);
-                        let mut logger = LOGGER.write();
-                        if let Err(e) = logger.log_factory_end_of_round(
-                            timestamp,
-                            round,
-                            factory.id(),
-                            factory.name().to_string(),
-                            product_id,
-                            format!("{:?}", factory.product_category()),
-                            factory.cash(),
-                            initial_stock,
-                            remaining_stock,
-                            supply_range_lower,
-                            supply_range_upper,
-                        ) {
-                            eprintln!("Failed to log factory end of round: {}", e);
-                        }
-                    }
-                }
-            }
-
-            // 检查是否所有agent的余额为0
-            let all_agents_broke = {
-                let agents = self.agents.write();
-                agents.iter().all(|agent| {
-                    let mut a = agent.write();
-                    a.income((800.0, 1200.0));
-                    a.cash() < 0.01
-                })
-            };
-
-            if self.break_simulation_loop(round,self.consecutive_zero_trades){
+            self.ubi();
+            if self.break_simulation_loop(round, self.consecutive_zero_trades) {
                 break;
             }
-
             round += 1;
             thread::sleep(std::time::Duration::from_millis(100));
         }
     }
 
-    fn break_simulation_loop(&self,round:u64,consecutive_zero_trades:u32) -> bool{
+    fn break_simulation_loop(&self, round: u64, consecutive_zero_trades: u32) -> bool {
         let agents = self.agents.read();
         let all_agents_broke_up = agents.iter().all(|agent| {
             let mut a = agent.read();
             a.cash() < 0.01
         });
-        if all_agents_broke_up{
-            println!("simulation finish at round {}",round);
+        if all_agents_broke_up {
+            println!("simulation finish at round {}", round);
             println!("Reason: All agents have zero or negative cash.\n");
             return true;
         }
-        if round > MAX_ROUND{
-            println!("simulation finish at round {}",round);
+        if round > MAX_ROUND {
+            println!("simulation finish at round {}", round);
             println!("Reason: Reached maximum rounds ({})\n", MAX_ROUND);
             return true;
         }
-        if consecutive_zero_trades >= 20{
-            println!("simulation finish at round {}",round);
-            println!("Reason: No trades for {} consecutive rounds.\n", consecutive_zero_trades);
+        if consecutive_zero_trades >= 20 {
+            println!("simulation finish at round {}", round);
+            println!(
+                "Reason: No trades for {} consecutive rounds.\n",
+                consecutive_zero_trades
+            );
             return true;
         }
         false
     }
-
 }
-
-
 
 /// 处理单个商品的交易逻辑（线程安全版本）
 fn process_product_trades(
@@ -385,10 +379,191 @@ mod tests {
     use super::*;
     use crate::entity::normal_distribute::NormalDistribution;
     use crate::model::product::ProductCategory;
-    
+
     // 测试 shuffle_before_round 方法
     #[test]
     fn test_shuffle_before_round() {
+        // 创建一个简单的产品用于测试
+        let price_distribution =
+            NormalDistribution::new(100.0, 1, "test_price_dist".to_string(), 10.0);
+        let elastic_distribution =
+            NormalDistribution::new(1.0, 1, "test_elastic_dist".to_string(), 0.2);
+        let cost_distribution = NormalDistribution::new(80.0, 1, "test_cost_dist".to_string(), 5.0);
+
+        let product = Product::from(
+            1,
+            "Test Product".to_string(),
+            ProductCategory::from_str("Food"),
+            1.0,
+            price_distribution,
+            elastic_distribution,
+            cost_distribution,
+        );
+
+        let products = vec![product];
+
+        // 创建市场实例
+        let mut market = Market::new(products);
+
+        // 获取初始状态
+        let initial_factories = market.factories.clone();
+        let initial_agents = market.agents.read().clone();
+
+        // 获取初始工厂顺序（按ID）
+        let initial_factory_ids: Vec<u64> = initial_factories
+            .get(&1)
+            .unwrap()
+            .read()
+            .iter()
+            .map(|f| f.id())
+            .collect();
+
+        // 获取初始agent顺序（按ID）
+        let initial_agent_ids: Vec<u64> = initial_agents.iter().map(|a| a.read().id()).collect();
+
+        // 多次调用 shuffle_before_round 方法，提高顺序变化的概率
+        let mut factory_shuffled = false;
+        let mut agent_shuffled = false;
+
+        // 最多尝试10次，直到顺序发生变化
+        for _ in 0..10 {
+            market.shuffle_before_round();
+
+            // 获取打乱后的状态
+            let current_factory_ids: Vec<u64> = market
+                .factories
+                .get(&1)
+                .unwrap()
+                .read()
+                .iter()
+                .map(|f| f.id())
+                .collect();
+
+            let current_agent_ids: Vec<u64> =
+                market.agents.read().iter().map(|a| a.read().id()).collect();
+
+            if initial_factory_ids != current_factory_ids {
+                factory_shuffled = true;
+            }
+
+            if initial_agent_ids != current_agent_ids {
+                agent_shuffled = true;
+            }
+
+            // 如果两者都已经变化，就可以提前结束
+            if factory_shuffled && agent_shuffled {
+                break;
+            }
+        }
+
+        // 验证工厂和agent的顺序至少有一次发生了变化
+        assert!(factory_shuffled, "经过10次尝试，工厂顺序没有被打乱");
+        assert!(agent_shuffled, "经过10次尝试，agent顺序没有被打乱");
+
+        // 最后一次获取打乱后的状态，用于验证数量和ID存在性
+        let final_factory_ids: Vec<u64> = market
+            .factories
+            .get(&1)
+            .unwrap()
+            .read()
+            .iter()
+            .map(|f| f.id())
+            .collect();
+
+        let final_agent_ids: Vec<u64> =
+            market.agents.read().iter().map(|a| a.read().id()).collect();
+
+        // 验证所有工厂和agent都被保留，只是顺序变化
+        assert_eq!(
+            initial_factory_ids.len(),
+            final_factory_ids.len(),
+            "工厂数量发生变化"
+        );
+        assert_eq!(
+            initial_agent_ids.len(),
+            final_agent_ids.len(),
+            "agent数量发生变化"
+        );
+
+        // 验证所有原始ID都存在于打乱后的列表中
+        for id in initial_factory_ids.iter() {
+            assert!(final_factory_ids.contains(id), "工厂ID {} 丢失", id);
+        }
+
+        for id in initial_agent_ids.iter() {
+            assert!(final_agent_ids.contains(id), "agent ID {} 丢失", id);
+        }
+    }
+
+    // 测试 break_simulation_loop 方法
+    #[test]
+    fn test_break_simulation_loop() {
+        // 创建一个简单的产品用于测试
+        let price_distribution =
+            NormalDistribution::new(100.0, 1, "test_price_dist".to_string(), 10.0);
+        let elastic_distribution =
+            NormalDistribution::new(1.0, 1, "test_elastic_dist".to_string(), 0.2);
+        let cost_distribution = NormalDistribution::new(80.0, 1, "test_cost_dist".to_string(), 5.0);
+
+        let product = Product::from(
+            1,
+            "Test Product".to_string(),
+            ProductCategory::from_str("Food"),
+            1.0,
+            price_distribution,
+            elastic_distribution,
+            cost_distribution,
+        );
+
+        let products = vec![product];
+
+        // 创建市场实例，使用products.clone()保留原始products
+        let market = Market::new(products.clone());
+
+        // 测试1: 没有退出条件满足时，返回false
+        let result1 = market.break_simulation_loop(100, 5);
+        assert!(
+            !result1,
+            "当没有退出条件满足时，break_simulation_loop 应返回 false"
+        );
+
+        // 测试2: 当连续零交易量达到20时，返回true
+        let result2 = market.break_simulation_loop(100, 20);
+        assert!(
+            result2,
+            "当连续零交易量达到20时，break_simulation_loop 应返回 true"
+        );
+
+        // 测试3: 当达到最大轮次时，返回true
+        const MAX_ROUND: u64 = 8000;
+        let result3 = market.break_simulation_loop(MAX_ROUND + 1, 5);
+        assert!(
+            result3,
+            "当达到最大轮次时，break_simulation_loop 应返回 true"
+        );
+
+        // 测试4: 当所有代理人破产时，返回true
+        // 创建一个所有代理人都破产的市场
+        let market_with_broke_agents = Market::new(products);
+        {
+            let mut agents = market_with_broke_agents.agents.write();
+            for agent in agents.iter_mut() {
+                let mut a = agent.write();
+                // 将代理人的现金设置为0，使其破产
+                a.set_cash(0.0);
+            }
+        }
+
+        let result4 = market_with_broke_agents.break_simulation_loop(100, 5);
+        assert!(
+            result4,
+            "当所有代理人破产时，break_simulation_loop 应返回 true"
+        );
+    }
+    
+    // 测试 ubi 方法
+    #[test]
+    fn test_ubi() {
         // 创建一个简单的产品用于测试
         let price_distribution = NormalDistribution::new(100.0, 1, "test_price_dist".to_string(), 10.0);
         let elastic_distribution = NormalDistribution::new(1.0, 1, "test_elastic_dist".to_string(), 0.2);
@@ -409,139 +584,30 @@ mod tests {
         // 创建市场实例
         let mut market = Market::new(products);
         
-        // 获取初始状态
-        let initial_factories = market.factories.clone();
-        let initial_agents = market.agents.read().clone();
+        // 记录初始现金
+        let initial_cash: Vec<f64> = {
+            let agents = market.agents.read();
+            agents.iter()
+                .map(|agent| agent.read().cash())
+                .collect()
+        };
         
-        // 获取初始工厂顺序（按ID）
-        let initial_factory_ids: Vec<u64> = initial_factories.get(&1)
-            .unwrap()
-            .read()
-            .iter()
-            .map(|f| f.id())
-            .collect();
+        // 调用 ubi 方法
+        market.ubi();
         
-        // 获取初始agent顺序（按ID）
-        let initial_agent_ids: Vec<u64> = initial_agents
-            .iter()
-            .map(|a| a.read().id())
-            .collect();
+        // 记录调用后的现金
+        let after_cash: Vec<f64> = {
+            let agents = market.agents.read();
+            agents.iter()
+                .map(|agent| agent.read().cash())
+                .collect()
+        };
         
-        // 多次调用 shuffle_before_round 方法，提高顺序变化的概率
-        let mut factory_shuffled = false;
-        let mut agent_shuffled = false;
-        
-        // 最多尝试10次，直到顺序发生变化
-        for _ in 0..10 {
-            market.shuffle_before_round();
-            
-            // 获取打乱后的状态
-            let current_factory_ids: Vec<u64> = market.factories.get(&1)
-                .unwrap()
-                .read()
-                .iter()
-                .map(|f| f.id())
-                .collect();
-            
-            let current_agent_ids: Vec<u64> = market.agents.read()
-                .iter()
-                .map(|a| a.read().id())
-                .collect();
-            
-            if initial_factory_ids != current_factory_ids {
-                factory_shuffled = true;
-            }
-            
-            if initial_agent_ids != current_agent_ids {
-                agent_shuffled = true;
-            }
-            
-            // 如果两者都已经变化，就可以提前结束
-            if factory_shuffled && agent_shuffled {
-                break;
-            }
+        // 验证所有代理人的现金都有所增加，且增加的金额在预期范围内（800.0 到 1200.0 之间）
+        for (i, (initial, after)) in initial_cash.iter().zip(after_cash.iter()).enumerate() {
+            let increase = after - initial;
+            assert!(increase >= 800.0, "代理人 {} 的收入增加量不应少于 800.0，实际增加了 {}", i + 1, increase);
+            assert!(increase <= 1200.0, "代理人 {} 的收入增加量不应超过 1200.0，实际增加了 {}", i + 1, increase);
         }
-        
-        // 验证工厂和agent的顺序至少有一次发生了变化
-        assert!(factory_shuffled, "经过10次尝试，工厂顺序没有被打乱");
-        assert!(agent_shuffled, "经过10次尝试，agent顺序没有被打乱");
-        
-        // 最后一次获取打乱后的状态，用于验证数量和ID存在性
-        let final_factory_ids: Vec<u64> = market.factories.get(&1)
-            .unwrap()
-            .read()
-            .iter()
-            .map(|f| f.id())
-            .collect();
-        
-        let final_agent_ids: Vec<u64> = market.agents.read()
-            .iter()
-            .map(|a| a.read().id())
-            .collect();
-        
-        // 验证所有工厂和agent都被保留，只是顺序变化
-        assert_eq!(initial_factory_ids.len(), final_factory_ids.len(), "工厂数量发生变化");
-        assert_eq!(initial_agent_ids.len(), final_agent_ids.len(), "agent数量发生变化");
-        
-        // 验证所有原始ID都存在于打乱后的列表中
-        for id in initial_factory_ids.iter() {
-            assert!(final_factory_ids.contains(id), "工厂ID {} 丢失", id);
-        }
-        
-        for id in initial_agent_ids.iter() {
-            assert!(final_agent_ids.contains(id), "agent ID {} 丢失", id);
-        }
-    }
-    
-    // 测试 break_simulation_loop 方法
-    #[test]
-    fn test_break_simulation_loop() {
-        // 创建一个简单的产品用于测试
-        let price_distribution = NormalDistribution::new(100.0, 1, "test_price_dist".to_string(), 10.0);
-        let elastic_distribution = NormalDistribution::new(1.0, 1, "test_elastic_dist".to_string(), 0.2);
-        let cost_distribution = NormalDistribution::new(80.0, 1, "test_cost_dist".to_string(), 5.0);
-        
-        let product = Product::from(
-            1,
-            "Test Product".to_string(),
-            ProductCategory::from_str("Food"),
-            1.0,
-            price_distribution,
-            elastic_distribution,
-            cost_distribution,
-        );
-        
-        let products = vec![product];
-        
-        // 创建市场实例，使用products.clone()保留原始products
-        let market = Market::new(products.clone());
-        
-        // 测试1: 没有退出条件满足时，返回false
-        let result1 = market.break_simulation_loop(100, 5);
-        assert!(!result1, "当没有退出条件满足时，break_simulation_loop 应返回 false");
-        
-        // 测试2: 当连续零交易量达到20时，返回true
-        let result2 = market.break_simulation_loop(100, 20);
-        assert!(result2, "当连续零交易量达到20时，break_simulation_loop 应返回 true");
-        
-        // 测试3: 当达到最大轮次时，返回true
-        const MAX_ROUND: u64 = 8000;
-        let result3 = market.break_simulation_loop(MAX_ROUND + 1, 5);
-        assert!(result3, "当达到最大轮次时，break_simulation_loop 应返回 true");
-        
-        // 测试4: 当所有代理人破产时，返回true
-        // 创建一个所有代理人都破产的市场
-        let market_with_broke_agents = Market::new(products);
-        {
-            let mut agents = market_with_broke_agents.agents.write();
-            for agent in agents.iter_mut() {
-                let mut a = agent.write();
-                // 将代理人的现金设置为0，使其破产
-                a.set_cash(0.0);
-            }
-        }
-        
-        let result4 = market_with_broke_agents.break_simulation_loop(100, 5);
-        assert!(result4, "当所有代理人破产时，break_simulation_loop 应返回 true");
     }
 }
