@@ -6,7 +6,6 @@ pub struct FinancialBill {
     pub total_stock: u16,      //这一轮次的总库存
     pub total_production: u16, //这一轮次的总生产量
     pub initial_stock: u16,    //这一轮次的初始库存
-    pub final_stock: u16,      //这一轮次的最终库存
     pub rot_stock: u16,        //这一轮次的损失的库存
     pub remaining_stock: u16,  //这一轮次的剩余库存
     pub production_cost: f64, //这一轮次的生产成本
@@ -24,7 +23,6 @@ impl FinancialBill {
             total_stock: 0,
             total_production: 0,
             initial_stock: 0,
-            final_stock: 0,
             rot_stock: 0,
             remaining_stock: 0,
             production_cost: 0.0,
@@ -46,9 +44,6 @@ impl FinancialBill {
     }
     pub fn set_initial_stock(&mut self, initial_stock: u16) {
         self.initial_stock = initial_stock;
-    }
-    pub fn set_final_stock(&mut self, final_stock: u16) {
-        self.final_stock = final_stock;
     }
     pub fn set_rot_stock(&mut self, rot_stock: u16) {
         self.rot_stock = rot_stock;
@@ -81,7 +76,6 @@ mod tests {
         assert_eq!(bill.total_stock, 0);
         assert_eq!(bill.total_production, 0);
         assert_eq!(bill.initial_stock, 0);
-        assert_eq!(bill.final_stock, 0);
         assert_eq!(bill.rot_stock, 0);
         assert_eq!(bill.remaining_stock, 0);
     }
@@ -116,12 +110,7 @@ mod tests {
         bill.set_initial_stock(100);
         assert_eq!(bill.initial_stock, 100);
     }
-    #[test]
-    fn test_set_final_stock() {
-        let mut bill = FinancialBill::new(1000.0);
-        bill.set_final_stock(100);
-        assert_eq!(bill.final_stock, 100);
-    }
+
     #[test]
     fn test_set_rot_stock() {
         let mut bill = FinancialBill::new(1000.0);

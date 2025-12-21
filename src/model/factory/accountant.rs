@@ -63,7 +63,6 @@ mod tests {
             total_stock: 100,
             total_production: 100,
             initial_stock: 100,
-            final_stock: 50,
             rot_stock: 50,
             remaining_stock: 50,
             production_cost: 0.0,
@@ -79,7 +78,6 @@ mod tests {
         assert_eq!(bill.read().total_stock, 100);
         assert_eq!(bill.read().total_production, 100);
         assert_eq!(bill.read().initial_stock, 100);
-        assert_eq!(bill.read().final_stock, 50);
         assert_eq!(bill.read().rot_stock, 50);
         assert_eq!(bill.read().remaining_stock, 50);
     }
@@ -95,7 +93,6 @@ mod tests {
                 total_stock: i as u16,
                 total_production: i as u16,
                 initial_stock: i as u16,
-                final_stock: i as u16,
                 rot_stock: i as u16,
                 remaining_stock: i as u16,
                 production_cost: 0.0,
