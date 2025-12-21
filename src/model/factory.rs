@@ -258,7 +258,7 @@ impl Factory {
         bill.set_rot_stock(rot_stock);
         bill.set_units_sold(sales_amount);
         println!("bill.cash :{:?} self.cash:{:?}", bill.cash, self.cash);
-        let revenue = bill.cash - self.cash;
+        let revenue = self.cash - bill.cash  ;
         bill.set_revenue(revenue);
         bill.set_cash(self.cash);
         bill.set_remaining_stock(*remaining_stock - rot_stock);
@@ -1118,12 +1118,12 @@ mod tests {
 
         let mut stocks = factory.amount.entry(1).or_insert(0);
         *stocks = 6;
-        factory.cash = 51.0;
+        factory.cash = 149.0;
         factory.settling_after_round(1);
         let b = factory.accountant.get_bill_or_default(1);
         let bill = b.read();
 
-        assert_eq!(bill.cash, 51.0);
+        assert_eq!(bill.cash, 149.0);
         assert_eq!(bill.revenue, 49.0);
         assert_eq!(bill.initial_stock, 10);
         assert_eq!(bill.remaining_stock, 3);
