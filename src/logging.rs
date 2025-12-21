@@ -273,8 +273,8 @@ impl Logger {
         product_id: u64,
         product_category: String,
         cash: f64,
-        initial_stock: i16,
-        remaining_stock: i16,
+        initial_stock: u16,
+        remaining_stock: u16,
         supply_range_lower: f64,
         supply_range_upper: f64,
     ) -> Result<(), Box<dyn std::error::Error>> {

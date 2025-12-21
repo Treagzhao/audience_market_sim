@@ -193,7 +193,12 @@ impl Market {
             } else {
                 self.consecutive_zero_trades = 0;
             }
-
+            for (_product_id, factory_list_arc) in self.factories.iter_mut() {
+                let mut factory_list = factory_list_arc.write();
+                for factory in factory_list.iter_mut() {
+                   factory.settling_after_round(round);
+                }
+            }
             self.set_agent_log_after_round(round, current_timestamp, total_trades);
             self.factory_log_after_round(round, current_timestamp, total_trades);
 
