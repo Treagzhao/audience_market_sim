@@ -102,17 +102,18 @@ impl Factory {
 
     /// 开始新一轮
     pub fn start_round(&mut self, round: u64) {
-        //todo start_round里需要给bill设置 cash 和 initial_stock + product_cost;
-        let last_round_initial_stock = self.initial_stock;
-        let last_round_remaining_stock = self.remaining_stock;
-        let last_sales = last_round_initial_stock - last_round_remaining_stock;
+        let last_b = self.accountant.get_bill_or_default(round - 1);
+        let last_bill = last_b.read();
+        let last_round_initial_stock = last_bill.initial_stock;
+        let last_round_remaining_stock = last_bill.remaining_stock;
+        let last_sales = last_bill.units_sold;
         let prediction_production = if last_round_initial_stock == 0 {
             1
         } else if last_round_remaining_stock == 0 {
             let rate = 1.1 + 0.4 * self.risk_appetite;
             (last_round_initial_stock as f64 * rate) as u16
         } else {
-            (last_sales - last_round_remaining_stock).max(0)
+            last_bill.total_production.max(1)
         };
 
         let production_under_budget = (self.cash * self.risk_appetite / self.product_cost) as u16;
@@ -122,6 +123,11 @@ impl Factory {
         // 扣除产量带来的成本
         let cost = need_production as f64 * self.product_cost;
         self.cash -= cost;
+        let b = self.accountant.get_bill_or_default(round);
+        let mut bill = b.write();
+        bill.set_cash(self.cash);
+        bill.set_initial_stock(self.initial_stock);
+        bill.set_total_production(need_production);
 
         // 给hashmap创建一个以round为键，值为计算出的产量
         self.amount.insert(round, self.initial_stock);
