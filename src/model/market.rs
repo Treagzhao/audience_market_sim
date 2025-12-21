@@ -124,7 +124,7 @@ impl Market {
         }
     }
 
-    fn ubi(&mut self)  {
+    fn ubi(&mut self) {
         let mut agents = self.agents.write();
         agents.iter_mut().for_each(|agent| {
             let mut a = agent.write();
@@ -132,10 +132,9 @@ impl Market {
         });
     }
 
-
     pub fn run(&mut self) {
         let mut rng = rand::thread_rng();
-        let mut round = 1;
+        let mut round = 1; //比如得从1 开始，因为很多初值是以0来设置的
         let mut total_trades = 0;
 
         loop {
@@ -560,15 +559,17 @@ mod tests {
             "当所有代理人破产时，break_simulation_loop 应返回 true"
         );
     }
-    
+
     // 测试 ubi 方法
     #[test]
     fn test_ubi() {
         // 创建一个简单的产品用于测试
-        let price_distribution = NormalDistribution::new(100.0, 1, "test_price_dist".to_string(), 10.0);
-        let elastic_distribution = NormalDistribution::new(1.0, 1, "test_elastic_dist".to_string(), 0.2);
+        let price_distribution =
+            NormalDistribution::new(100.0, 1, "test_price_dist".to_string(), 10.0);
+        let elastic_distribution =
+            NormalDistribution::new(1.0, 1, "test_elastic_dist".to_string(), 0.2);
         let cost_distribution = NormalDistribution::new(80.0, 1, "test_cost_dist".to_string(), 5.0);
-        
+
         let product = Product::from(
             1,
             "Test Product".to_string(),
@@ -578,36 +579,42 @@ mod tests {
             elastic_distribution,
             cost_distribution,
         );
-        
+
         let products = vec![product];
-        
+
         // 创建市场实例
         let mut market = Market::new(products);
-        
+
         // 记录初始现金
         let initial_cash: Vec<f64> = {
             let agents = market.agents.read();
-            agents.iter()
-                .map(|agent| agent.read().cash())
-                .collect()
+            agents.iter().map(|agent| agent.read().cash()).collect()
         };
-        
+
         // 调用 ubi 方法
         market.ubi();
-        
+
         // 记录调用后的现金
         let after_cash: Vec<f64> = {
             let agents = market.agents.read();
-            agents.iter()
-                .map(|agent| agent.read().cash())
-                .collect()
+            agents.iter().map(|agent| agent.read().cash()).collect()
         };
-        
+
         // 验证所有代理人的现金都有所增加，且增加的金额在预期范围内（800.0 到 1200.0 之间）
         for (i, (initial, after)) in initial_cash.iter().zip(after_cash.iter()).enumerate() {
             let increase = after - initial;
-            assert!(increase >= 800.0, "代理人 {} 的收入增加量不应少于 800.0，实际增加了 {}", i + 1, increase);
-            assert!(increase <= 1200.0, "代理人 {} 的收入增加量不应超过 1200.0，实际增加了 {}", i + 1, increase);
+            assert!(
+                increase >= 800.0,
+                "代理人 {} 的收入增加量不应少于 800.0，实际增加了 {}",
+                i + 1,
+                increase
+            );
+            assert!(
+                increase <= 1200.0,
+                "代理人 {} 的收入增加量不应超过 1200.0，实际增加了 {}",
+                i + 1,
+                increase
+            );
         }
     }
 }
