@@ -7,8 +7,8 @@ use crate::model::factory::accountant::Accountant;
 use crate::model::factory::financial_bill::FinancialBill;
 use crate::model::product::{Product, ProductCategory};
 use crate::model::util::shift_range_by_ratio;
-use std::borrow::BorrowMut;
 use rand::Rng;
+use std::borrow::BorrowMut;
 use std::collections::{HashMap, LinkedList};
 
 pub struct Factory {
@@ -249,13 +249,16 @@ impl Factory {
         let mut b = self.accountant.get_bill_or_default(round);
         let mut bill = b.write();
         let remaining_stock = self.amount.get(&round).unwrap_or(&0);
-        println!("initial_stock :{:?} remaining_stock :{:?}",bill.initial_stock,remaining_stock);
+        println!(
+            "initial_stock :{:?} remaining_stock :{:?}",
+            bill.initial_stock, remaining_stock
+        );
         let rot_stock = (*remaining_stock as f64 * (1.0 - self.durability)) as u16;
         let sales_amount = (bill.initial_stock - remaining_stock).max(0);
         bill.set_rot_stock(rot_stock);
         bill.set_units_sold(sales_amount);
-        println!("bill.cash :{:?} self.cash:{:?}",bill.cash,self.cash);
-        let revenue =   bill.cash - self.cash;
+        println!("bill.cash :{:?} self.cash:{:?}", bill.cash, self.cash);
+        let revenue = bill.cash - self.cash;
         bill.set_revenue(revenue);
         bill.set_cash(self.cash);
         bill.set_remaining_stock(*remaining_stock - rot_stock);
@@ -330,8 +333,8 @@ fn get_range_change_ratio(interval_relation: Option<IntervalRelation>) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::entity::normal_distribute::NormalDistribution;
     use super::*;
+    use crate::entity::normal_distribute::NormalDistribution;
     use crate::model::product::{Product, ProductCategory};
 
     #[test]
@@ -421,125 +424,183 @@ mod tests {
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
         factory.risk_appetite = 0.5;
 
-        // 设置初始状态：初始库存100，剩余库存0
-        factory.initial_stock = 100;
-        factory.remaining_stock = 0;
+        // 为上一轮设置财务账单数据
+        let last_round = 1;
+        let b = factory.accountant.get_bill_or_default(last_round);
+        let mut last_bill = b.write();
+        last_bill.set_initial_stock(100);
+        last_bill.set_remaining_stock(0); // 售罄
+        last_bill.set_total_production(100);
+        last_bill.set_units_sold(100);
+        // 保存last_remaining_stock值
+        let last_remaining_stock = last_bill.remaining_stock;
+        drop(last_bill);
+
         factory.cash = 100000.0;
         factory.product_cost = 1.0;
 
-        factory.start_round(2);
-        let actual_production = factory.amount.get(&2).unwrap();
+        let current_round = 2;
+        factory.start_round(current_round);
+        let actual_initial_stock = factory.amount.get(&current_round).unwrap();
 
         // 验证产量在上一轮initial_stock的1.1~1.5倍之间
         let last_initial_stock = 100;
         let expected_min = (last_initial_stock as f64 * 1.1) as u16;
         let expected_max = (last_initial_stock as f64 * 1.5) as u16;
+        let actual_production = actual_initial_stock - last_remaining_stock;
         assert!(
-            *actual_production >= expected_min,
+            actual_production >= expected_min,
             "Branch 2: When stock is sold out, production should be at least 1.1x last initial stock"
         );
         assert!(
-            *actual_production <= expected_max,
+            actual_production <= expected_max,
             "Branch 2: When stock is sold out, production should be at most 1.5x last initial stock"
         );
     }
 
     #[test]
     fn test_start_round_branch3_1() {
-        // 分支3.1: else分支，(last_sales - last_round_remaining_stock) > 0
+        // 分支3.1: else分支，有剩余库存的情况
         let product = Product::new(1, "test_product".to_string(), ProductCategory::Food, 1.0);
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
 
-        // 设置初始状态：初始库存100，剩余库存20
-        factory.initial_stock = 100;
-        factory.remaining_stock = 20;
+        // 为上一轮设置财务账单数据
+        let last_round = 1;
+        let b = factory.accountant.get_bill_or_default(last_round);
+        let mut last_bill = b.write();
+        last_bill.set_initial_stock(100);
+        last_bill.set_remaining_stock(20);
+        last_bill.set_total_production(100);
+        last_bill.set_units_sold(80);
+        // 保存last_remaining_stock值
+        let last_remaining_stock = last_bill.remaining_stock;
+        drop(last_bill);
+
         factory.cash = 100000.0;
         factory.product_cost = 1.0;
 
-        // prediction_production = (100-20 - 20).max(0) = 60
-        // need_production = min(60, 100000*0.5/1.0) = 60
-        // new initial_stock = 20 + 60 = 80
-        factory.start_round(2);
-        let actual_initial_stock = factory.amount.get(&2).unwrap();
+        // 新的逻辑：有剩余库存时，保持稳定产量
+        let current_round = 2;
+        factory.start_round(current_round);
+        let actual_initial_stock = factory.amount.get(&current_round).unwrap();
 
+        // 预期：上一轮剩余库存 + 上一轮总产量
+        let expected_initial_stock = last_remaining_stock + 100;
         assert_eq!(
-            *actual_initial_stock, 80,
-            "Branch 3.1: When (last_sales - last_round_remaining_stock) > 0, amount should store new initial_stock = 80"
+            *actual_initial_stock, expected_initial_stock,
+            "Branch 3.1: When there is remaining stock, should keep stable production"
         );
     }
 
     #[test]
     fn test_start_round_branch3_2() {
-        // 分支3.2: else分支，(last_sales - last_round_remaining_stock) <= 0
+        // 分支3.2: else分支，有剩余库存的情况
         let product = Product::new(1, "test_product".to_string(), ProductCategory::Food, 1.0);
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
 
-        // 设置初始状态：初始库存50，剩余库存40
-        factory.initial_stock = 50;
-        factory.remaining_stock = 40;
+        // 为上一轮设置财务账单数据
+        let last_round = 1;
+        let b = factory.accountant.get_bill_or_default(last_round);
+        let mut last_bill = b.write();
+        last_bill.set_initial_stock(50);
+        last_bill.set_remaining_stock(40);
+        last_bill.set_total_production(50);
+        last_bill.set_units_sold(10);
+        // 保存last_remaining_stock值
+        let last_remaining_stock = last_bill.remaining_stock;
+        drop(last_bill);
+
         factory.cash = 100000.0;
         factory.product_cost = 1.0;
 
-        // prediction_production = (50-40 - 40).max(0) = 0
-        // need_production = min(0, 100000*0.5/1.0) = 0
-        // new initial_stock = 40 + 0 = 40
-        factory.start_round(2);
-        let actual_initial_stock = factory.amount.get(&2).unwrap();
+        // 新的逻辑：有剩余库存时，保持稳定产量
+        let current_round = 2;
+        factory.start_round(current_round);
+        let actual_initial_stock = factory.amount.get(&current_round).unwrap();
 
+        // 预期：上一轮剩余库存 + 上一轮总产量
+        let expected_initial_stock = last_remaining_stock + 50;
         assert_eq!(
-            *actual_initial_stock, 40,
-            "Branch 3.2: When (last_sales - last_round_remaining_stock) <= 0, amount should store new initial_stock = 40"
+            *actual_initial_stock, expected_initial_stock,
+            "Branch 3.2: When there is remaining stock, should keep stable production"
         );
     }
 
     #[test]
     fn test_start_round_branch4_1() {
-        // 分支4.1: min(prediction_production, production_under_budget) = prediction_production
+        // 分支4.1: 预算充足的情况
         let product = Product::new(1, "test_product".to_string(), ProductCategory::Food, 1.0);
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
 
-        // 设置初始状态：初始库存100，剩余库存20
-        factory.initial_stock = 100;
-        factory.remaining_stock = 20;
+        // 为上一轮设置财务账单数据
+        let last_round = 1;
+        let b = factory.accountant.get_bill_or_default(last_round);
+        let mut last_bill = b.write();
+        last_bill.set_initial_stock(100);
+        last_bill.set_remaining_stock(20);
+        last_bill.set_total_production(100);
+        last_bill.set_units_sold(80);
+        // 保存last_remaining_stock值
+        let last_remaining_stock = last_bill.remaining_stock;
+        drop(last_bill);
+
         factory.cash = 100000.0; // 大量现金，确保预算充足
         factory.product_cost = 1.0;
 
-        // prediction_production = (100-20 - 20).max(0) = 60
-        // production_under_budget = 100000 * 0.5 / 1.0 = 50000
-        // need_production = min(60, 50000) = 60
-        // new initial_stock = 20 + 60 = 80
-        factory.start_round(2);
-        let actual_initial_stock = factory.amount.get(&2).unwrap();
+        let current_round = 2;
+        factory.start_round(current_round);
+        let actual_initial_stock = factory.amount.get(&current_round).unwrap();
 
+        // 预期：上一轮剩余库存 + 上一轮总产量
+        let expected_initial_stock = last_remaining_stock + 100;
         assert_eq!(
-            *actual_initial_stock, 80,
-            "Branch 4.1: When budget is sufficient, amount should store new initial_stock = 80"
+            *actual_initial_stock, expected_initial_stock,
+            "Branch 4.1: When budget is sufficient, should keep stable production"
         );
     }
 
     #[test]
     fn test_start_round_branch4_2() {
-        // 分支4.2: min(prediction_production, production_under_budget) = production_under_budget
+        // 分支4.2: 预算不足的情况
         let product = Product::new(1, "test_product".to_string(), ProductCategory::Food, 1.0);
         let mut factory = Factory::new(1, "test_factory".to_string(), &product);
 
-        // 设置初始状态：初始库存100，剩余库存20
-        factory.initial_stock = 100;
-        factory.remaining_stock = 20;
-        factory.cash = 10.0; // 很少的现金，确保预算不足
+        // 为上一轮设置财务账单数据
+        let last_round = 1;
+        let b = factory.accountant.get_bill_or_default(last_round);
+        let mut last_bill = b.write();
+        last_bill.set_initial_stock(100);
+        last_bill.set_remaining_stock(20);
+        last_bill.set_total_production(100);
+        last_bill.set_units_sold(80);
+        // 保存last_remaining_stock值
+        let last_remaining_stock = last_bill.remaining_stock;
+        drop(last_bill);
+
+        // 设置很少的现金，确保预算不足
+        let initial_cash = 10.0;
+        factory.cash = initial_cash;
         factory.product_cost = 1.0;
         factory.risk_appetite = 0.5;
 
-        // prediction_production = (100-20 - 20).max(0) = 60
-        // production_under_budget = (10.0 * 0.5) / 1.0 = 5.0，转换为i16是5
-        // need_production = min(60, 5) = 5
-        // new initial_stock = 20 + 5 = 25
-        factory.start_round(2);
-        let actual_initial_stock = factory.amount.get(&2).unwrap();
+        let current_round = 2;
+        factory.start_round(current_round);
+        let actual_initial_stock = factory.amount.get(&current_round).unwrap();
+
+        // 更准确地计算预期值，与start_round方法逻辑保持一致
+        let production_under_budget =
+            (initial_cash * factory.risk_appetite / factory.product_cost) as u16;
+        let prediction_production = 100; // 上一轮的总产量
+        let need_production = prediction_production.min(production_under_budget);
+        let expected_initial_stock = last_remaining_stock + need_production;
 
         assert_eq!(
-            *actual_initial_stock, 25,
-            "Branch 4.2: When budget is insufficient, amount should store new initial_stock = 25"
+            *actual_initial_stock, expected_initial_stock,
+            "Branch 4.2: When budget is insufficient, initial_stock should match expected value"
+        );
+        assert!(
+            *actual_initial_stock > 0,
+            "Branch 4.2: Initial_stock should be greater than 0"
         );
     }
 
@@ -1036,7 +1097,7 @@ mod tests {
 
     #[test]
     fn test_factory_setting_after_round() {
-        let product =  Product::from(
+        let product = Product::from(
             1,
             "aaaa".to_string(),
             ProductCategory::Food,
@@ -1046,11 +1107,7 @@ mod tests {
             NormalDistribution::random(1, "aaaa_cost_dist".to_string(), Some(0.0), Some(1.0)),
         );
 
-        let mut factory = Factory::new(
-            1,
-            "Test Factory".to_string(),
-            &product,
-        );
+        let mut factory = Factory::new(1, "Test Factory".to_string(), &product);
         {
             let mut b = factory.accountant.get_bill_or_default(1);
             let mut bill = b.write();
@@ -1059,7 +1116,7 @@ mod tests {
             bill.set_production_cost(20.0);
         }
 
-        let mut stocks =  factory.amount.entry(1).or_insert(0);
+        let mut stocks = factory.amount.entry(1).or_insert(0);
         *stocks = 6;
         factory.cash = 51.0;
         factory.settling_after_round(1);
@@ -1072,6 +1129,6 @@ mod tests {
         assert_eq!(bill.remaining_stock, 3);
         assert_eq!(bill.units_sold, 4);
         assert_eq!(bill.rot_stock, 3);
-        assert_eq!(bill.profit,49.0 - (3.0 + 4.0) * factory.product_cost);
+        assert_eq!(bill.profit, 49.0 - (3.0 + 4.0) * factory.product_cost);
     }
 }
