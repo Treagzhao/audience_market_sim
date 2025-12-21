@@ -1,16 +1,20 @@
+mod accountant;
+mod financial_bill;
+
 use crate::logging::{LOGGER, log_factory_range_optimization};
 use crate::model::agent::{IntervalRelation, TradeResult};
+use crate::model::factory::accountant::Accountant;
 use crate::model::product::{Product, ProductCategory};
 use crate::model::util::shift_range_by_ratio;
 use log::debug;
 use rand::Rng;
 use std::collections::{HashMap, LinkedList};
 
-#[derive(Clone)]
 pub struct Factory {
     id: u64,
     name: String,
     product_id: u64,
+    accountant: Accountant,
     product_category: ProductCategory,
     supply_price_range: (f64, f64),
     amount: HashMap<u64, i16>,
@@ -54,6 +58,7 @@ impl Factory {
             id,
             name,
             product_id: product.id(),
+            accountant: Accountant::new(cash),
             product_category: product.product_category(),
             supply_price_range: (lower, upper),
             amount: HashMap::new(),
