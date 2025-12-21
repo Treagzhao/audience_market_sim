@@ -7,11 +7,11 @@ mod trade_log;
 
 // 导入日志结构体和函数
 use crate::logging::agent_cash_log::{AgentCashLog, log_agent_cash};
-use crate::logging::agent_demand_removal_log::{log_agent_demand_removal, AgentDemandRemovalLog};
+use crate::logging::agent_demand_removal_log::{AgentDemandRemovalLog, log_agent_demand_removal};
 use crate::logging::agent_range_adjustment_log::{
     AgentRangeAdjustmentLog, log_agent_range_adjustment,
 };
-use crate::logging::factory_end_of_round_log::{log_factory_end_of_round, FactoryEndOfRoundLog};
+use crate::logging::factory_end_of_round_log::{FactoryEndOfRoundLog, log_factory_end_of_round};
 use crate::logging::factory_range_optimization_log::FactoryRangeOptimizationLog;
 pub use crate::logging::factory_range_optimization_log::log_factory_range_optimization;
 use crate::logging::trade_log::{TradeLog, log_trade};
@@ -37,6 +37,9 @@ lazy_static! {
     ));
 }
 
+#[cfg(test)]
+pub fn init_mysql_client() {}
+#[cfg(not(test))]
 // 初始化MySQL连接池
 pub fn init_mysql_client() {
     let host = env::var("MYSQL_HOST").unwrap_or("localhost".to_string());
@@ -106,17 +109,17 @@ impl Logger {
 
     pub fn log_trade(
         &mut self,
-        timestamp:i64,
+        timestamp: i64,
         round: u64,
         trade_id: u64,
         agent_id: u64,
         agent_name: String,
         agent_cash: f64,
-        agent_pref_original_price:f64,
-        agent_pref_original_elastic:f64,
-        agent_pref_current_price:f64,
-        agent_pref_current_range_lower:f64,
-        agent_pref_current_range_upper:f64,
+        agent_pref_original_price: f64,
+        agent_pref_original_elastic: f64,
+        agent_pref_current_price: f64,
+        agent_pref_current_range_lower: f64,
+        agent_pref_current_range_upper: f64,
         factory: &Factory,
         product: &Product,
         trade_result: &TradeResult,
@@ -227,7 +230,15 @@ impl Logger {
         cash: f64,
         total_trades: u64,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let sql = log_agent_cash(timestamp, self.task_id.clone(), round, agent_id, agent_name, cash, total_trades);
+        let sql = log_agent_cash(
+            timestamp,
+            self.task_id.clone(),
+            round,
+            agent_id,
+            agent_name,
+            cash,
+            total_trades,
+        );
         self.tx.send(sql)?;
         Ok(())
     }
@@ -294,5 +305,315 @@ impl Logger {
         );
         self.tx.send(sql)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn test_log_factory_range_optimization() {
+        let (tx, rc) = mpsc::sync_channel::<String>(10);
+        let mut logger = Logger {
+            task_id: "".to_string(),
+            tx: tx,
+        };
+        let mut signal = Arc::new(RwLock::new(false));
+        let s_c = signal.clone();
+        let counter = Arc::new(RwLock::new(0u8));
+        let c_c = counter.clone();
+        let h = thread::spawn(move || {
+            let mut counter = 0;
+            let mut sig = false;
+            loop {
+                println!("counter: {}", counter);
+                for s in &rc {
+                    assert!(s.contains("factory_range_optimization_logs"));
+                    let mut c = c_c.write();
+                    *c += 1;
+                    sig = true;
+                    break;
+                }
+
+                if counter >= 100 || sig {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(1));
+                counter += 1;
+            }
+        });
+        logger
+            .log_factory_range_optimization(
+                1,
+                2,
+                "a".to_string(),
+                4,
+                "".to_string(),
+                (0.1, 0.2),
+                (0.3, 0.4),
+                0.5,
+                0.6,
+                0.7,
+                0.8,
+                0.9,
+                "ffff",
+            )
+            .unwrap();
+
+        h.join().unwrap();
+        let v = counter.read();
+        assert_eq!(*v, 1);
+    }
+
+    #[test]
+    fn test_log_agent_range_adjustment() {
+        let (tx, rc) = mpsc::sync_channel::<String>(10);
+        let mut logger = Logger {
+            task_id: "".to_string(),
+            tx: tx,
+        };
+        let counter = Arc::new(RwLock::new(0u8));
+        let c_c = counter.clone();
+        let h = thread::spawn(move || {
+            let mut counter = 0;
+            let mut sig = false;
+            loop {
+                for s in &rc {
+                    assert!(s.contains("agent_range_adjustment_logs"));
+                    let mut c = c_c.write();
+                    *c += 1;
+                    sig = true;
+                    break;
+                }
+
+                if counter >= 100 || sig {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(1));
+                counter += 1;
+            }
+        });
+        logger
+            .log_agent_range_adjustment(
+                1,
+                2,
+                "agent_name".to_string(),
+                3,
+                "category".to_string(),
+                (0.1, 0.2),
+                (0.3, 0.4),
+                0.5,
+                0.6,
+                0.7,
+                0.8,
+                0.9,
+                "adjustment_type",
+                Some(1.0),
+            )
+            .unwrap();
+
+        h.join().unwrap();
+        let v = counter.read();
+        assert_eq!(*v, 1);
+    }
+
+    #[test]
+    fn test_log_agent_cash() {
+        let (tx, rc) = mpsc::sync_channel::<String>(10);
+        let mut logger = Logger {
+            task_id: "".to_string(),
+            tx: tx,
+        };
+        let counter = Arc::new(RwLock::new(0u8));
+        let c_c = counter.clone();
+        let h = thread::spawn(move || {
+            let mut counter = 0;
+            let mut sig = false;
+            loop {
+                for s in &rc {
+                    assert!(s.contains("agent_cash_logs"));
+                    let mut c = c_c.write();
+                    *c += 1;
+                    sig = true;
+                    break;
+                }
+
+                if counter >= 100 || sig {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(1));
+                counter += 1;
+            }
+        });
+        logger
+            .log_agent_cash(123456789, 1, 2, "agent_name".to_string(), 100.0, 5)
+            .unwrap();
+
+        h.join().unwrap();
+        let v = counter.read();
+        assert_eq!(*v, 1);
+    }
+
+    #[test]
+    fn test_log_agent_demand_removal() {
+        let (tx, rc) = mpsc::sync_channel::<String>(10);
+        let logger = Logger {
+            task_id: "".to_string(),
+            tx: tx,
+        };
+        let counter = Arc::new(RwLock::new(0u8));
+        let c_c = counter.clone();
+        let h = thread::spawn(move || {
+            let mut counter = 0;
+            let mut sig = false;
+            loop {
+                for s in &rc {
+                    assert!(s.contains("agent_demand_removal_logs"));
+                    let mut c = c_c.write();
+                    *c += 1;
+                    sig = true;
+                    break;
+                }
+
+                if counter >= 100 || sig {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(1));
+                counter += 1;
+            }
+        });
+        logger
+            .log_agent_demand_removal(
+                1,
+                2,
+                "agent_name".to_string(),
+                3,
+                100.0,
+                Some(1.0),
+                Some(2.0),
+                Some(3.0),
+                Some(0.1),
+                Some(0.2),
+                "removal_reason",
+            )
+            .unwrap();
+
+        h.join().unwrap();
+        let v = counter.read();
+        assert_eq!(*v, 1);
+    }
+
+    #[test]
+    fn test_log_factory_end_of_round() {
+        let (tx, rc) = mpsc::sync_channel::<String>(10);
+        let logger = Logger {
+            task_id: "".to_string(),
+            tx: tx,
+        };
+        let counter = Arc::new(RwLock::new(0u8));
+        let c_c = counter.clone();
+        let h = thread::spawn(move || {
+            let mut counter = 0;
+            let mut sig = false;
+            loop {
+                for s in &rc {
+                    assert!(s.contains("factory_end_of_round_logs"));
+                    let mut c = c_c.write();
+                    *c += 1;
+                    sig = true;
+                    break;
+                }
+
+                if counter >= 100 || sig {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(1));
+                counter += 1;
+            }
+        });
+        logger
+            .log_factory_end_of_round(
+                123456789,
+                1,
+                2,
+                "factory_name".to_string(),
+                3,
+                "category".to_string(),
+                100.0,
+                20,
+                10,
+                0.1,
+                0.2,
+            )
+            .unwrap();
+
+        h.join().unwrap();
+        let v = counter.read();
+        assert_eq!(*v, 1);
+    }
+
+    #[test]
+    fn test_log_trade() {
+        let (tx, rc) = mpsc::sync_channel::<String>(10);
+        let mut logger = Logger {
+            task_id: "".to_string(),
+            tx: tx,
+        };
+        let counter = Arc::new(RwLock::new(0u8));
+        let c_c = counter.clone();
+        let h = thread::spawn(move || {
+            let mut counter = 0;
+            let mut sig = false;
+            loop {
+                for s in &rc {
+                    assert!(s.contains("trade_logs"));
+                    let mut c = c_c.write();
+                    *c += 1;
+                    sig = true;
+                    break;
+                }
+
+                if counter >= 100 || sig {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(1));
+                counter += 1;
+            }
+        });
+
+        // 创建测试所需的模拟数据
+        let product = Product::new(
+            1,
+            "test_product".to_string(),
+            crate::model::product::ProductCategory::Food,
+            1.0,
+        );
+        let factory = Factory::new(1, "test_factory".to_string(), &product);
+
+        logger
+            .log_trade(
+                123456789,
+                1,
+                2,
+                3,
+                "agent_name".to_string(),
+                100.0,
+                1.0,
+                2.0,
+                3.0,
+                0.1,
+                0.2,
+                &factory,
+                &product,
+                &TradeResult::Success(150.0),
+                "interval_relation",
+            )
+            .unwrap();
+
+        h.join().unwrap();
+        let v = counter.read();
+        assert_eq!(*v, 1);
     }
 }
