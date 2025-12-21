@@ -434,6 +434,13 @@ impl Agent {
     }
 }
 
+#[cfg(test)]
+impl Agent{
+    pub fn set_cash(&mut self,cash:f64){
+        self.cash = cash;
+    }
+}
+
 fn insert_demand(
     preference: &HashMap<u64, Preference>,
     demand: Arc<RwLock<HashMap<u64, bool>>>,
