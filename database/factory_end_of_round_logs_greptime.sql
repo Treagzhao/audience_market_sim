@@ -17,6 +17,13 @@ CREATE TABLE factory_end_of_round_logs (
     remaining_stock INT NOT NULL,    -- 剩余库存
     supply_range_lower DOUBLE NOT NULL, -- 供应范围下限
     supply_range_upper DOUBLE NOT NULL, -- 供应范围上限
+    units_sold INT NOT NULL,         -- 销售量
+    revenue DOUBLE NOT NULL,         -- 收入
+    total_stock INT NOT NULL,        -- 总库存
+    total_production INT NOT NULL,   -- 总产量
+    rot_stock INT NOT NULL,          -- 损耗库存
+    production_cost DOUBLE NOT NULL, -- 生产成本
+    profit DOUBLE NOT NULL,          -- 利润
     
     -- 指定时间索引
     TIME INDEX (`timestamp`),

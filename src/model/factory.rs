@@ -111,11 +111,11 @@ impl Factory {
             1
         } else if last_round_remaining_stock == 0 {
             let rate = 1.1 + 0.4 * self.risk_appetite;
-            (last_round_initial_stock as f64 * rate) as u16
+            ((last_round_initial_stock as f64 * rate) as u16).max(last_round_initial_stock + 1)
         } else {
             last_bill.total_production.max(1)
         };
-
+        println!("prediction_production: {:?}", prediction_production);
         let production_under_budget = (self.cash * self.risk_appetite / self.product_cost) as u16;
         let need_production = prediction_production.min(production_under_budget);
 
@@ -249,22 +249,22 @@ impl Factory {
         let mut b = self.accountant.get_bill_or_default(round);
         let mut bill = b.write();
         let remaining_stock = self.amount.get(&round).unwrap_or(&0);
-        println!(
-            "initial_stock :{:?} remaining_stock :{:?}",
-            bill.initial_stock, remaining_stock
-        );
         let rot_stock = (*remaining_stock as f64 * (1.0 - self.durability)) as u16;
         let sales_amount = (bill.initial_stock - remaining_stock).max(0);
         bill.set_rot_stock(rot_stock);
         bill.set_units_sold(sales_amount);
-        println!("bill.cash :{:?} self.cash:{:?}", bill.cash, self.cash);
-        let revenue = self.cash - bill.cash  ;
+        let revenue = self.cash - bill.cash;
         bill.set_revenue(revenue);
         bill.set_cash(self.cash);
         bill.set_remaining_stock(*remaining_stock - rot_stock);
         let units_gone = bill.units_sold + bill.rot_stock;
         let cost_of_goods_gone = units_gone as f64 * self.product_cost;
         bill.set_profit(revenue - cost_of_goods_gone);
+    }
+
+    pub fn get_round_bill(&self, round: u64) -> FinancialBill {
+        let b = self.accountant.get_round_bill(round);
+        b.expect("No bill found for round").clone()
     }
 }
 
@@ -1130,5 +1130,39 @@ mod tests {
         assert_eq!(bill.units_sold, 4);
         assert_eq!(bill.rot_stock, 3);
         assert_eq!(bill.profit, 49.0 - (3.0 + 4.0) * factory.product_cost);
+    }
+
+    #[test]
+    fn test_factory_get_round_bill() {
+        let product = Product::from(
+            1,
+            "aaaa".to_string(),
+            ProductCategory::Food,
+            0.5,
+            NormalDistribution::random(1, "aaaa_price_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "aaaa_elastic_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "aaaa_cost_dist".to_string(), Some(0.0), Some(1.0)),
+        );
+
+        let mut factory = Factory::new(1, "Test Factory".to_string(), &product);
+        {
+            let mut b = factory.accountant.get_bill_or_default(1);
+            let mut bill = b.write();
+            bill.set_cash(100.0);
+            bill.set_initial_stock(10);
+            bill.set_production_cost(20.0);
+        }
+
+        let bill = factory.get_round_bill(1);
+        assert_eq!(bill.cash, 100.0);
+        assert_eq!(bill.initial_stock, 10);
+        assert_eq!(bill.production_cost, 20.0);
+        assert_eq!(bill.units_sold, 0);
+        assert_eq!(bill.total_stock, 0);
+        assert_eq!(bill.total_production, 0);
+        assert_eq!(bill.rot_stock, 0);
+        assert_eq!(bill.remaining_stock, 0);
+        assert_eq!(bill.revenue, 0.0);
+        assert_eq!(bill.profit, 0.0);
     }
 }

@@ -288,6 +288,14 @@ impl Logger {
         remaining_stock: u16,
         supply_range_lower: f64,
         supply_range_upper: f64,
+        // 新增财务字段参数
+        units_sold: u16,
+        revenue: f64,
+        total_stock: u16,
+        total_production: u16,
+        rot_stock: u16,
+        production_cost: f64,
+        profit: f64,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let sql = log_factory_end_of_round(
             timestamp,
@@ -302,6 +310,14 @@ impl Logger {
             remaining_stock,
             supply_range_lower,
             supply_range_upper,
+            // 新增财务字段赋值
+            units_sold,
+            revenue,
+            total_stock,
+            total_production,
+            rot_stock,
+            production_cost,
+            profit,
         );
         self.tx.send(sql)?;
         Ok(())
@@ -508,7 +524,7 @@ mod tests {
     #[test]
     fn test_log_factory_end_of_round() {
         let (tx, rc) = mpsc::sync_channel::<String>(10);
-        let logger = Logger {
+        let logger = Logger{
             task_id: "".to_string(),
             tx: tx,
         };
@@ -533,21 +549,27 @@ mod tests {
                 counter += 1;
             }
         });
-        logger
-            .log_factory_end_of_round(
-                123456789,
-                1,
-                2,
-                "factory_name".to_string(),
-                3,
-                "category".to_string(),
-                100.0,
-                20,
-                10,
-                0.1,
-                0.2,
-            )
-            .unwrap();
+        logger.log_factory_end_of_round(
+            123456789,
+            1,
+            2,
+            "factory_name".to_string(),
+            3,
+            "category".to_string(),
+            100.0,
+            20,
+            10,
+            0.1,
+            0.2,
+            // 新增财务字段测试值
+            10,
+            500.0,
+            20,
+            15,
+            5,
+            200.0,
+            300.0,
+        ).unwrap();
 
         h.join().unwrap();
         let v = counter.read();
