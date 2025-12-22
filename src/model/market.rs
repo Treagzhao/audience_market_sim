@@ -100,10 +100,8 @@ impl Market {
             for factory in factory_list.iter() {
                 let product_id = factory.product_id();
                 let (supply_range_lower, supply_range_upper) = factory.supply_price_range();
-                // 获取本轮开始时的初始产量
-                let initial_stock = factory.get_initial_stock();
-                // 获取本轮结束时的剩余库存（经过交易后的库存）
-                let remaining_stock = factory.get_stock(round);
+                // 获取本轮财务账单
+                let bill = factory.get_round_bill(round);
                 let mut logger = LOGGER.write();
                 if let Err(e) = logger.log_factory_end_of_round(
                     timestamp,
@@ -113,10 +111,18 @@ impl Market {
                     product_id,
                     format!("{:?}", factory.product_category()),
                     factory.cash(),
-                    initial_stock,
-                    remaining_stock,
+                    bill.initial_stock,
+                    bill.remaining_stock,
                     supply_range_lower,
                     supply_range_upper,
+                    // 新增财务字段数据
+                    bill.units_sold,
+                    bill.revenue,
+                    bill.total_stock,
+                    bill.total_production,
+                    bill.rot_stock,
+                    bill.production_cost,
+                    bill.profit,
                 ) {
                     eprintln!("Failed to log factory end of round: {}", e);
                 }

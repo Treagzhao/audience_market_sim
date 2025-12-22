@@ -12,6 +12,14 @@ pub struct FactoryEndOfRoundLog {
     pub remaining_stock: u16,
     pub supply_range_lower: f64,
     pub supply_range_upper: f64,
+    // 新增财务字段
+    pub units_sold: u16,
+    pub revenue: f64,
+    pub total_stock: u16,
+    pub total_production: u16,
+    pub rot_stock: u16,
+    pub production_cost: f64,
+    pub profit: f64,
 }
 
 impl FactoryEndOfRoundLog {
@@ -28,6 +36,14 @@ impl FactoryEndOfRoundLog {
         remaining_stock: u16,
         supply_range_lower: f64,
         supply_range_upper: f64,
+        // 新增财务字段参数
+        units_sold: u16,
+        revenue: f64,
+        total_stock: u16,
+        total_production: u16,
+        rot_stock: u16,
+        production_cost: f64,
+        profit: f64,
     ) -> Self {
         FactoryEndOfRoundLog {
             timestamp,
@@ -42,6 +58,14 @@ impl FactoryEndOfRoundLog {
             remaining_stock,
             supply_range_lower,
             supply_range_upper,
+            // 新增财务字段赋值
+            units_sold,
+            revenue,
+            total_stock,
+            total_production,
+            rot_stock,
+            production_cost,
+            profit,
         }
     }
 }
@@ -63,9 +87,17 @@ pub fn generate_create_table_sql() -> String {
         remaining_stock SMALLINT NOT NULL,
         supply_range_lower DOUBLE NOT NULL,
         supply_range_upper DOUBLE NOT NULL,
+        units_sold SMALLINT NOT NULL,
+        revenue DOUBLE NOT NULL,
+        total_stock SMALLINT NOT NULL,
+        total_production SMALLINT NOT NULL,
+        rot_stock SMALLINT NOT NULL,
+        production_cost DOUBLE NOT NULL,
+        profit DOUBLE NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    "#.to_string()
+    "#
+    .to_string()
 }
 
 pub fn log_factory_end_of_round(
@@ -81,6 +113,14 @@ pub fn log_factory_end_of_round(
     remaining_stock: u16,
     supply_range_lower: f64,
     supply_range_upper: f64,
+    // 新增财务字段参数
+    units_sold: u16,
+    revenue: f64,
+    total_stock: u16,
+    total_production: u16,
+    rot_stock: u16,
+    production_cost: f64,
+    profit: f64,
 ) -> String {
     let log = FactoryEndOfRoundLog::new(
         timestamp,
@@ -95,6 +135,14 @@ pub fn log_factory_end_of_round(
         remaining_stock,
         supply_range_lower,
         supply_range_upper,
+        // 新增财务字段赋值
+        units_sold,
+        revenue,
+        total_stock,
+        total_production,
+        rot_stock,
+        production_cost,
+        profit,
     );
 
     // 准备SQL语句
@@ -102,10 +150,12 @@ pub fn log_factory_end_of_round(
         r#"
                 INSERT INTO factory_end_of_round_logs (
                     timestamp, round, task_id, factory_id, factory_name, product_id, product_category,
-                    cash, initial_stock, remaining_stock, supply_range_lower, supply_range_upper
+                    cash, initial_stock, remaining_stock, supply_range_lower, supply_range_upper,
+                    units_sold, revenue, total_stock, total_production, rot_stock, production_cost, profit
                 ) VALUES (
                     {}, {}, '{}', {}, '{}', {}, '{}',
-                    {}, {}, {}, {}, {}
+                    {}, {}, {}, {}, {},
+                    {}, {}, {}, {}, {}, {}, {}
                 )
             "#,
         log.timestamp,
@@ -119,7 +169,15 @@ pub fn log_factory_end_of_round(
         log.initial_stock,
         log.remaining_stock,
         log.supply_range_lower,
-        log.supply_range_upper
+        log.supply_range_upper,
+        // 新增财务字段值
+        log.units_sold,
+        log.revenue,
+        log.total_stock,
+        log.total_production,
+        log.rot_stock,
+        log.production_cost,
+        log.profit
     );
     sql
 }
@@ -142,6 +200,14 @@ mod tests {
         let remaining_stock = 30;
         let supply_range_lower = 50.0;
         let supply_range_upper = 150.0;
+        // 新增财务字段测试值
+        let units_sold = 70;
+        let revenue = 1500.0;
+        let total_stock = 100;
+        let total_production = 100;
+        let rot_stock = 5;
+        let production_cost = 800.0;
+        let profit = 700.0;
 
         let log = FactoryEndOfRoundLog::new(
             timestamp,
@@ -156,6 +222,13 @@ mod tests {
             remaining_stock,
             supply_range_lower,
             supply_range_upper,
+            units_sold,
+            revenue,
+            total_stock,
+            total_production,
+            rot_stock,
+            production_cost,
+            profit,
         );
 
         // 验证所有字段
@@ -171,6 +244,14 @@ mod tests {
         assert_eq!(log.remaining_stock, remaining_stock);
         assert_eq!(log.supply_range_lower, supply_range_lower);
         assert_eq!(log.supply_range_upper, supply_range_upper);
+        // 验证新增财务字段
+        assert_eq!(log.units_sold, units_sold);
+        assert_eq!(log.revenue, revenue);
+        assert_eq!(log.total_stock, total_stock);
+        assert_eq!(log.total_production, total_production);
+        assert_eq!(log.rot_stock, rot_stock);
+        assert_eq!(log.production_cost, production_cost);
+        assert_eq!(log.profit, profit);
     }
 
     #[test]
@@ -187,6 +268,14 @@ mod tests {
         let remaining_stock = 0;
         let supply_range_lower = 50.0;
         let supply_range_upper = 150.0;
+        // 新增财务字段测试值
+        let units_sold = 0;
+        let revenue = 0.0;
+        let total_stock = 0;
+        let total_production = 0;
+        let rot_stock = 0;
+        let production_cost = 0.0;
+        let profit = 0.0;
 
         let log = FactoryEndOfRoundLog::new(
             timestamp,
@@ -201,12 +290,27 @@ mod tests {
             remaining_stock,
             supply_range_lower,
             supply_range_upper,
+            units_sold,
+            revenue,
+            total_stock,
+            total_production,
+            rot_stock,
+            production_cost,
+            profit,
         );
 
         assert_eq!(log.initial_stock, initial_stock);
         assert_eq!(log.remaining_stock, remaining_stock);
         assert_eq!(log.supply_range_lower, supply_range_lower);
         assert_eq!(log.supply_range_upper, supply_range_upper);
+        // 验证新增财务字段
+        assert_eq!(log.units_sold, units_sold);
+        assert_eq!(log.revenue, revenue);
+        assert_eq!(log.total_stock, total_stock);
+        assert_eq!(log.total_production, total_production);
+        assert_eq!(log.rot_stock, rot_stock);
+        assert_eq!(log.production_cost, production_cost);
+        assert_eq!(log.profit, profit);
     }
 
     #[test]
@@ -216,7 +320,7 @@ mod tests {
 
         // 验证SQL包含正确的表名
         assert!(sql.contains("CREATE TABLE IF NOT EXISTS factory_end_of_round_logs"));
-        
+
         // 验证SQL包含所有必要的字段
         assert!(sql.contains("id INT AUTO_INCREMENT PRIMARY KEY"));
         assert!(sql.contains("timestamp BIGINT NOT NULL"));
@@ -232,7 +336,7 @@ mod tests {
         assert!(sql.contains("supply_range_lower DOUBLE NOT NULL"));
         assert!(sql.contains("supply_range_upper DOUBLE NOT NULL"));
         assert!(sql.contains("created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"));
-        
+
         // 验证SQL使用了正确的引擎和字符集
         assert!(sql.contains("ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"));
     }
@@ -251,6 +355,14 @@ mod tests {
         let remaining_stock = 30;
         let supply_range_lower = 50.0;
         let supply_range_upper = 150.0;
+        // 新增财务字段测试值
+        let units_sold = 70;
+        let revenue = 1500.0;
+        let total_stock = 100;
+        let total_production = 100;
+        let rot_stock = 5;
+        let production_cost = 800.0;
+        let profit = 700.0;
 
         let sql = log_factory_end_of_round(
             timestamp,
@@ -265,6 +377,13 @@ mod tests {
             remaining_stock,
             supply_range_lower,
             supply_range_upper,
+            units_sold,
+            revenue,
+            total_stock,
+            total_production,
+            rot_stock,
+            production_cost,
+            profit,
         );
 
         // 验证SQL包含正确的表名和字段
@@ -281,6 +400,14 @@ mod tests {
         assert!(sql.contains("remaining_stock"));
         assert!(sql.contains("supply_range_lower"));
         assert!(sql.contains("supply_range_upper"));
+        // 验证SQL包含新增的财务字段
+        assert!(sql.contains("units_sold"));
+        assert!(sql.contains("revenue"));
+        assert!(sql.contains("total_stock"));
+        assert!(sql.contains("total_production"));
+        assert!(sql.contains("rot_stock"));
+        assert!(sql.contains("production_cost"));
+        assert!(sql.contains("profit"));
 
         // 验证SQL包含正确的值
         assert!(sql.contains(&timestamp.to_string()));
@@ -295,6 +422,14 @@ mod tests {
         assert!(sql.contains(&remaining_stock.to_string()));
         assert!(sql.contains(&supply_range_lower.to_string()));
         assert!(sql.contains(&supply_range_upper.to_string()));
+        // 验证SQL包含新增财务字段的值
+        assert!(sql.contains(&units_sold.to_string()));
+        assert!(sql.contains(&revenue.to_string()));
+        assert!(sql.contains(&total_stock.to_string()));
+        assert!(sql.contains(&total_production.to_string()));
+        assert!(sql.contains(&rot_stock.to_string()));
+        assert!(sql.contains(&production_cost.to_string()));
+        assert!(sql.contains(&profit.to_string()));
     }
 
     #[test]
@@ -311,6 +446,14 @@ mod tests {
         let remaining_stock = 100; // 库存没有变化
         let supply_range_lower = 50.0;
         let supply_range_upper = 150.0;
+        // 新增财务字段测试值
+        let units_sold = 0; // 库存没有变化，销售量为0
+        let revenue = 0.0;
+        let total_stock = 100;
+        let total_production = 0;
+        let rot_stock = 0;
+        let production_cost = 0.0;
+        let profit = 0.0;
 
         let sql = log_factory_end_of_round(
             timestamp,
@@ -325,6 +468,13 @@ mod tests {
             remaining_stock,
             supply_range_lower,
             supply_range_upper,
+            units_sold,
+            revenue,
+            total_stock,
+            total_production,
+            rot_stock,
+            production_cost,
+            profit,
         );
 
         // 验证SQL生成正确
@@ -333,6 +483,9 @@ mod tests {
         assert!(sql.contains(&remaining_stock.to_string()));
         assert!(sql.contains(&"TestCategory"));
         assert!(sql.contains(&"TestCategory"));
+        // 验证SQL包含新增财务字段
+        assert!(sql.contains(&units_sold.to_string()));
+        assert!(sql.contains(&revenue.to_string()));
     }
 
     #[test]
@@ -349,6 +502,14 @@ mod tests {
         let remaining_stock = 0;
         let supply_range_lower = 50.0;
         let supply_range_upper = 150.0;
+        // 新增财务字段测试值
+        let units_sold = 0;
+        let revenue = 0.0;
+        let total_stock = 0;
+        let total_production = 0;
+        let rot_stock = 0;
+        let production_cost = 0.0;
+        let profit = 0.0;
 
         let sql = log_factory_end_of_round(
             timestamp,
@@ -363,11 +524,21 @@ mod tests {
             remaining_stock,
             supply_range_lower,
             supply_range_upper,
+            units_sold,
+            revenue,
+            total_stock,
+            total_production,
+            rot_stock,
+            production_cost,
+            profit,
         );
 
         // 验证SQL生成正确
         assert!(sql.contains("INSERT INTO factory_end_of_round_logs"));
         assert!(sql.contains(&initial_stock.to_string()));
         assert!(sql.contains(&remaining_stock.to_string()));
+        // 验证SQL包含新增财务字段
+        assert!(sql.contains(&units_sold.to_string()));
+        assert!(sql.contains(&revenue.to_string()));
     }
 }

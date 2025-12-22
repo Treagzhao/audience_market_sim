@@ -31,6 +31,12 @@ impl Accountant {
         }
     }
 
+    pub fn get_round_bill(&self,round:u64) -> Option<FinancialBill> {
+        let b = self.bills.get(&round)?;
+        let bill = b.read();
+        Some(bill.clone())
+    }
+
     pub fn get_bill_or_default(&mut self, round: u64) -> Arc<RwLock<FinancialBill>> {
         let bill = self
             .bills
@@ -109,5 +115,32 @@ mod tests {
         let mut accountant = Accountant::new(0.1);
         let bill = accountant.get_bill_or_default(1);
         assert_eq!(bill.read().cash, 0.0);
+    }
+
+    #[test]
+    fn test_accountant_get_round_bill() {
+        let mut accountant = Accountant::new(0.1);
+        let bill = FinancialBill {
+            cash: 100.0,
+            units_sold: 50,
+            revenue: 0.0,
+            total_stock: 100,
+            total_production: 100,
+            initial_stock: 100,
+            rot_stock: 50,
+            remaining_stock: 50,
+            production_cost: 0.0,
+            profit: 0.0,
+        };
+        accountant.add_bill(1, bill);
+        let bill = accountant.get_round_bill(1);
+        assert!(bill.is_some());
+        assert_eq!(bill.unwrap().cash, 100.0);
+        assert_eq!(bill.unwrap().units_sold, 50);
+        assert_eq!(bill.unwrap().total_stock, 100);
+        assert_eq!(bill.unwrap().total_production, 100);
+        assert_eq!(bill.unwrap().initial_stock, 100);
+        assert_eq!(bill.unwrap().rot_stock, 50);
+        assert_eq!(bill.unwrap().remaining_stock, 50);
     }
 }
