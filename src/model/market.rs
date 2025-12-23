@@ -102,6 +102,10 @@ impl Market {
                 let (supply_range_lower, supply_range_upper) = factory.supply_price_range();
                 // 获取本轮财务账单
                 let bill = factory.get_round_bill(round);
+                // 计算毛利率
+                let gross_margin = bill.get_cogs();
+                // 获取工厂状态
+                let factory_status = format!("{:?}", factory.status());
                 let mut logger = LOGGER.write();
                 if let Err(e) = logger.log_factory_end_of_round(
                     timestamp,
@@ -123,6 +127,10 @@ impl Market {
                     bill.rot_stock,
                     bill.production_cost,
                     bill.profit,
+                    // 新增毛利率数据
+                    gross_margin,
+                    // 新增工厂状态数据
+                    factory_status,
                 ) {
                     eprintln!("Failed to log factory end of round: {}", e);
                 }
@@ -202,7 +210,7 @@ impl Market {
             for (_product_id, factory_list_arc) in self.factories.iter_mut() {
                 let mut factory_list = factory_list_arc.write();
                 for factory in factory_list.iter_mut() {
-                   factory.settling_after_round(round);
+                    factory.settling_after_round(round);
                 }
             }
             self.set_agent_log_after_round(round, current_timestamp, total_trades);

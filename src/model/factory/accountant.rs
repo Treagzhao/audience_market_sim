@@ -21,17 +21,15 @@ impl Accountant {
         }
     }
 
-    pub fn add_bill(&mut self, moment: u64, bill: FinancialBill) {
-        self.bills.insert(moment, Arc::new(RwLock::new(bill)));
+    pub fn add_bill(&mut self, moment: u64) {
         self.moments.push_back(moment);
-
         if self.moments.len() > 20 {
             let oldest_moment = self.moments.pop_front().unwrap();
             self.bills.remove(&oldest_moment);
         }
     }
 
-    pub fn get_round_bill(&self,round:u64) -> Option<FinancialBill> {
+    pub fn get_round_bill(&self, round: u64) -> Option<FinancialBill> {
         let b = self.bills.get(&round)?;
         let bill = b.read();
         Some(bill.clone())
@@ -43,6 +41,27 @@ impl Accountant {
             .entry(round)
             .or_insert_with(|| Arc::new(RwLock::new(FinancialBill::new(0.0))));
         bill.clone()
+    }
+
+    pub fn total_round_bill(&self) -> FinancialBill {
+        let mut bill = FinancialBill::new(0.0);
+        let mut count = 0;
+        for moment in self.moments.iter() {
+            let b = self.bills.get(moment).unwrap();
+            let bill_read = b.read();
+            bill.cash = bill_read.cash;
+            bill.units_sold += bill_read.units_sold;
+            bill.revenue += bill_read.revenue;
+            bill.total_stock += bill_read.total_stock;
+            bill.total_production += bill_read.total_production;
+            bill.initial_stock += bill_read.initial_stock;
+            bill.rot_stock += bill_read.rot_stock;
+            bill.remaining_stock += bill_read.remaining_stock;
+            bill.production_cost += bill_read.production_cost;
+            bill.profit += bill_read.profit;
+            count += 1;
+        }
+        bill
     }
 }
 
@@ -74,18 +93,9 @@ mod tests {
             production_cost: 0.0,
             profit: 0.0,
         };
-        accountant.add_bill(1, bill);
-        assert_eq!(accountant.bills.len(), 2);
+        accountant.add_bill(1);
         assert_eq!(accountant.moments.len(), 2);
 
-        let bill = accountant.bills.get(&1).unwrap();
-        assert_eq!(bill.read().cash, 100.0);
-        assert_eq!(bill.read().units_sold, 50);
-        assert_eq!(bill.read().total_stock, 100);
-        assert_eq!(bill.read().total_production, 100);
-        assert_eq!(bill.read().initial_stock, 100);
-        assert_eq!(bill.read().rot_stock, 50);
-        assert_eq!(bill.read().remaining_stock, 50);
     }
 
     #[test]
@@ -104,9 +114,8 @@ mod tests {
                 production_cost: 0.0,
                 profit: 0.0,
             };
-            accountant.add_bill(i, bill);
+            accountant.add_bill(i);
         }
-        assert_eq!(accountant.bills.len(), 20);
         assert_eq!(accountant.moments.len(), 20);
     }
 
@@ -132,15 +141,16 @@ mod tests {
             production_cost: 0.0,
             profit: 0.0,
         };
-        accountant.add_bill(1, bill);
-        let bill = accountant.get_round_bill(1);
-        assert!(bill.is_some());
-        assert_eq!(bill.unwrap().cash, 100.0);
-        assert_eq!(bill.unwrap().units_sold, 50);
-        assert_eq!(bill.unwrap().total_stock, 100);
-        assert_eq!(bill.unwrap().total_production, 100);
-        assert_eq!(bill.unwrap().initial_stock, 100);
-        assert_eq!(bill.unwrap().rot_stock, 50);
-        assert_eq!(bill.unwrap().remaining_stock, 50);
+        accountant.add_bill(1);
+       assert_eq!(accountant.moments.len(),2);
+    }
+
+    #[test]
+    fn test_25_rounds_add_bill() {
+        let mut accountant = Accountant::new(0.1);
+        for i in 0..25 {
+            accountant.add_bill(i);
+        }
+        assert_eq!(accountant.moments.len(), 20);
     }
 }

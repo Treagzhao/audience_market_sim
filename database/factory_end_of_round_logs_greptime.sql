@@ -24,6 +24,8 @@ CREATE TABLE factory_end_of_round_logs (
     rot_stock INT NOT NULL,          -- 损耗库存
     production_cost DOUBLE NOT NULL, -- 生产成本
     profit DOUBLE NOT NULL,          -- 利润
+    gross_margin DOUBLE NOT NULL,    -- 毛利率
+    factory_status STRING NOT NULL,  -- 工厂状态
     
     -- 指定时间索引
     TIME INDEX (`timestamp`),

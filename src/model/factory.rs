@@ -10,6 +10,12 @@ use crate::model::util::shift_range_by_ratio;
 use rand::Rng;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, LinkedList};
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
+pub enum FactoryStatus {
+    #[default]
+    Active,
+    BrokeUp,
+}
 
 pub struct Factory {
     id: u64,
@@ -26,6 +32,7 @@ pub struct Factory {
     cash: f64,
     initial_stock: u16,
     risk_appetite: f64,
+    status: FactoryStatus,
 }
 
 impl Factory {
@@ -70,6 +77,7 @@ impl Factory {
             cash,
             initial_stock: 0,
             risk_appetite: rng.gen_range(0.1..0.9),
+            status: FactoryStatus::default(),
         }
     }
 
@@ -259,12 +267,31 @@ impl Factory {
         bill.set_remaining_stock(*remaining_stock - rot_stock);
         let units_gone = bill.units_sold + bill.rot_stock;
         let cost_of_goods_gone = units_gone as f64 * self.product_cost;
+        bill.production_cost = cost_of_goods_gone;
         bill.set_profit(revenue - cost_of_goods_gone);
+        self.accountant.add_bill(round);
+        drop(bill);
+        let total_bill = self.accountant.total_round_bill();
+        if round > 20 && total_bill.units_sold <= 0 {
+            self.status = FactoryStatus::BrokeUp;
+        }
     }
 
     pub fn get_round_bill(&self, round: u64) -> FinancialBill {
         let b = self.accountant.get_round_bill(round);
         b.expect("No bill found for round").clone()
+    }
+
+    pub fn status(&self) -> FactoryStatus {
+        self.status
+    }
+
+    pub fn cogs_of_25_rounds(&self) -> f64 {
+        let all_bills = self.accountant.total_round_bill();
+        if all_bills.production_cost == 0.0 {
+            return 0.0;
+        }
+        all_bills.revenue / all_bills.production_cost
     }
 }
 
@@ -1164,5 +1191,43 @@ mod tests {
         assert_eq!(bill.remaining_stock, 0);
         assert_eq!(bill.revenue, 0.0);
         assert_eq!(bill.profit, 0.0);
+    }
+
+    #[test]
+    fn test_settling_after_round_broke_up() {
+        // 测试总产量为0时工厂状态变为BrokeUp
+        let product = Product::from(
+            1,
+            "test_product".to_string(),
+            ProductCategory::Food,
+            0.5,
+            NormalDistribution::random(1, "test_price_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_elastic_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_cost_dist".to_string(), Some(0.0), Some(1.0)),
+        );
+
+        let mut factory = Factory::new(1, "Test Factory".to_string(), &product);
+
+        // 设置round 1的库存
+        factory.amount.insert(1, 0);
+
+        // 设置财务账单，将total_production设为0
+        let bill = factory.accountant.get_bill_or_default(1);
+        {
+            let mut bill_write = bill.write();
+            bill_write.set_initial_stock(0);
+            bill_write.set_total_production(0);
+        }
+
+        // 初始状态应为Active
+        assert_eq!(factory.status(), FactoryStatus::Active);
+
+        // 调用settling_after_round方法
+        factory.settling_after_round(1);
+
+        assert_eq!(factory.status(), FactoryStatus::Active);
+
+        factory.settling_after_round(21);
+        assert_eq!(factory.status(), FactoryStatus::BrokeUp);
     }
 }
