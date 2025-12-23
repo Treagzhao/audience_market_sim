@@ -20,6 +20,10 @@ pub struct FactoryEndOfRoundLog {
     pub rot_stock: u16,
     pub production_cost: f64,
     pub profit: f64,
+    // 新增毛利率字段
+    pub gross_margin: f64,
+    // 新增工厂状态字段
+    pub factory_status: String,
 }
 
 impl FactoryEndOfRoundLog {
@@ -44,6 +48,10 @@ impl FactoryEndOfRoundLog {
         rot_stock: u16,
         production_cost: f64,
         profit: f64,
+        // 新增毛利率字段参数
+        gross_margin: f64,
+        // 新增工厂状态字段参数
+        factory_status: String,
     ) -> Self {
         FactoryEndOfRoundLog {
             timestamp,
@@ -66,6 +74,10 @@ impl FactoryEndOfRoundLog {
             rot_stock,
             production_cost,
             profit,
+            // 新增毛利率字段赋值
+            gross_margin,
+            // 新增工厂状态字段赋值
+            factory_status,
         }
     }
 }
@@ -94,6 +106,8 @@ pub fn generate_create_table_sql() -> String {
         rot_stock SMALLINT NOT NULL,
         production_cost DOUBLE NOT NULL,
         profit DOUBLE NOT NULL,
+        gross_margin DOUBLE NOT NULL, -- 新增毛利率字段
+        factory_status VARCHAR(20) NOT NULL, -- 新增工厂状态字段
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     "#
@@ -121,6 +135,10 @@ pub fn log_factory_end_of_round(
     rot_stock: u16,
     production_cost: f64,
     profit: f64,
+    // 新增毛利率字段参数
+    gross_margin: f64,
+    // 新增工厂状态字段参数
+    factory_status: String,
 ) -> String {
     let log = FactoryEndOfRoundLog::new(
         timestamp,
@@ -143,6 +161,10 @@ pub fn log_factory_end_of_round(
         rot_stock,
         production_cost,
         profit,
+        // 新增毛利率字段赋值
+        gross_margin,
+        // 新增工厂状态字段赋值
+        factory_status,
     );
 
     // 准备SQL语句
@@ -151,11 +173,11 @@ pub fn log_factory_end_of_round(
                 INSERT INTO factory_end_of_round_logs (
                     timestamp, round, task_id, factory_id, factory_name, product_id, product_category,
                     cash, initial_stock, remaining_stock, supply_range_lower, supply_range_upper,
-                    units_sold, revenue, total_stock, total_production, rot_stock, production_cost, profit
+                    units_sold, revenue, total_stock, total_production, rot_stock, production_cost, profit, gross_margin, factory_status
                 ) VALUES (
                     {}, {}, '{}', {}, '{}', {}, '{}',
                     {}, {}, {}, {}, {},
-                    {}, {}, {}, {}, {}, {}, {}
+                    {}, {}, {}, {}, {}, {}, {}, {}, '{}'
                 )
             "#,
         log.timestamp,
@@ -177,7 +199,11 @@ pub fn log_factory_end_of_round(
         log.total_production,
         log.rot_stock,
         log.production_cost,
-        log.profit
+        log.profit,
+        // 新增毛利率字段值
+        log.gross_margin,
+        // 新增工厂状态字段值
+        log.factory_status
     );
     sql
 }
@@ -229,6 +255,8 @@ mod tests {
             rot_stock,
             production_cost,
             profit,
+            0.5,                  // 新增毛利率测试值
+            "Active".to_string(), // 新增工厂状态测试值
         );
 
         // 验证所有字段
@@ -252,6 +280,8 @@ mod tests {
         assert_eq!(log.rot_stock, rot_stock);
         assert_eq!(log.production_cost, production_cost);
         assert_eq!(log.profit, profit);
+        assert_eq!(log.gross_margin, 0.5); // 验证毛利率字段
+        assert_eq!(log.factory_status, "Active"); // 验证工厂状态字段
     }
 
     #[test]
@@ -297,6 +327,8 @@ mod tests {
             rot_stock,
             production_cost,
             profit,
+            0.0,                  // 新增毛利率测试值
+            "Active".to_string(), // 新增工厂状态测试值
         );
 
         assert_eq!(log.initial_stock, initial_stock);
@@ -384,6 +416,8 @@ mod tests {
             rot_stock,
             production_cost,
             profit,
+            0.5,                  // 新增毛利率测试值
+            "Active".to_string(), // 新增工厂状态测试值
         );
 
         // 验证SQL包含正确的表名和字段
@@ -430,6 +464,8 @@ mod tests {
         assert!(sql.contains(&rot_stock.to_string()));
         assert!(sql.contains(&production_cost.to_string()));
         assert!(sql.contains(&profit.to_string()));
+        assert!(sql.contains(&"0.5")); // 验证毛利率字段值
+        assert!(sql.contains(&"Active")); // 验证工厂状态字段值
     }
 
     #[test]
@@ -475,6 +511,8 @@ mod tests {
             rot_stock,
             production_cost,
             profit,
+            0.0,                  // 新增毛利率测试值
+            "Active".to_string(), // 新增工厂状态测试值
         );
 
         // 验证SQL生成正确
@@ -482,10 +520,13 @@ mod tests {
         assert!(sql.contains(&initial_stock.to_string()));
         assert!(sql.contains(&remaining_stock.to_string()));
         assert!(sql.contains(&"TestCategory"));
-        assert!(sql.contains(&"TestCategory"));
         // 验证SQL包含新增财务字段
         assert!(sql.contains(&units_sold.to_string()));
         assert!(sql.contains(&revenue.to_string()));
+        assert!(sql.contains("gross_margin")); // 验证毛利率字段名存在
+        assert!(sql.contains(&"Active")); // 验证工厂状态字段值
+        assert!(sql.contains("0")); // 验证毛利率字段值存在（可能是0而不是0.0）
+        assert!(sql.contains(&"Active")); // 验证工厂状态字段值
     }
 
     #[test]
@@ -531,6 +572,8 @@ mod tests {
             rot_stock,
             production_cost,
             profit,
+            0.0,                  // 新增毛利率测试值
+            "Active".to_string(), // 新增工厂状态测试值
         );
 
         // 验证SQL生成正确

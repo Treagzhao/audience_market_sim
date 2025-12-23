@@ -296,6 +296,10 @@ impl Logger {
         rot_stock: u16,
         production_cost: f64,
         profit: f64,
+        // 新增毛利率字段参数
+        gross_margin: f64,
+        // 新增工厂状态字段参数
+        factory_status: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let sql = log_factory_end_of_round(
             timestamp,
@@ -318,6 +322,10 @@ impl Logger {
             rot_stock,
             production_cost,
             profit,
+            // 新增毛利率字段赋值
+            gross_margin,
+            // 新增工厂状态字段赋值
+            factory_status,
         );
         self.tx.send(sql)?;
         Ok(())
@@ -524,7 +532,7 @@ mod tests {
     #[test]
     fn test_log_factory_end_of_round() {
         let (tx, rc) = mpsc::sync_channel::<String>(10);
-        let logger = Logger{
+        let logger = Logger {
             task_id: "".to_string(),
             tx: tx,
         };
@@ -549,27 +557,31 @@ mod tests {
                 counter += 1;
             }
         });
-        logger.log_factory_end_of_round(
-            123456789,
-            1,
-            2,
-            "factory_name".to_string(),
-            3,
-            "category".to_string(),
-            100.0,
-            20,
-            10,
-            0.1,
-            0.2,
-            // 新增财务字段测试值
-            10,
-            500.0,
-            20,
-            15,
-            5,
-            200.0,
-            300.0,
-        ).unwrap();
+        logger
+            .log_factory_end_of_round(
+                123456789,
+                1,
+                2,
+                "factory_name".to_string(),
+                3,
+                "category".to_string(),
+                100.0,
+                20,
+                10,
+                0.1,
+                0.2,
+                // 新增财务字段测试值
+                10,
+                500.0,
+                20,
+                15,
+                5,
+                200.0,
+                300.0,
+                0.4,                  // 新增毛利率测试值
+                "Active".to_string(), // 新增工厂状态测试值
+            )
+            .unwrap();
 
         h.join().unwrap();
         let v = counter.read();

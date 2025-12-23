@@ -60,8 +60,18 @@ impl FinancialBill {
     pub fn set_cash(&mut self, cash: f64) {
         self.cash = cash;
     }
+    /// 计算这一轮次的毛利率
+    pub fn get_cogs(&self) -> f64 {
+        let delta = self.revenue - self.production_cost;
+        if self.revenue == 0.0{
+            return 0.0;
+        }
+        let rate = delta / self.revenue;
+        rate
+    }
 
 }
+
 
 
 #[cfg(test)]
@@ -142,5 +152,18 @@ mod tests {
         assert_eq!(bill.cash, 100.0);
     }
 
+    #[test]
+    fn test_get_cogs() {
+        let mut bill = FinancialBill::new(1000.0);
+        bill.set_revenue(100.0);
+        bill.set_production_cost(50.0);
+        let cogs = bill.get_cogs();
+        assert_eq!(cogs, 0.5);
+
+        // 测试当revenue为0时，cogs为0
+        bill.set_revenue(0.0);
+        let cogs = bill.get_cogs();
+        assert_eq!(cogs, 0.0);
+    }
 
 }
