@@ -288,10 +288,10 @@ impl Factory {
 
     pub fn cogs_of_25_rounds(&self) -> f64 {
         let all_bills = self.accountant.total_round_bill();
-        if all_bills.production_cost == 0.0 {
+        if all_bills.revenue == 0.0 {
             return 0.0;
         }
-        all_bills.revenue / all_bills.production_cost
+        (all_bills.revenue - all_bills.production_cost) / all_bills.revenue
     }
 }
 
@@ -1229,5 +1229,58 @@ mod tests {
 
         factory.settling_after_round(21);
         assert_eq!(factory.status(), FactoryStatus::BrokeUp);
+    }
+
+    #[test]
+    fn test_cogs_of_25_rounds() {
+        // 测试cogs_of_25_rounds方法
+        let product = Product::from(
+            1,
+            "test_product".to_string(),
+            ProductCategory::Food,
+            0.5,
+            NormalDistribution::random(1, "test_price_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_elastic_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_cost_dist".to_string(), Some(0.0), Some(1.0)),
+        );
+
+        let mut factory = Factory::new(1, "Test Factory".to_string(), &product);
+
+        // 测试场景1：收入为0.0，应该返回0.0
+        let cogs_1 = factory.cogs_of_25_rounds();
+        assert_eq!(cogs_1, 0.0);
+
+        // 测试场景2：正常情况下，应该返回正确的毛利率计算结果
+        // 使用get_bill_or_default方法获取并修改账单
+        let bill1 = factory.accountant.get_bill_or_default(1);
+        {
+            let mut bill_write = bill1.write();
+            bill_write.set_revenue(150.0);
+            bill_write.set_production_cost(100.0);
+        }
+
+        // 调用add_bill方法，确保moment被添加到moments列表中
+        factory.accountant.add_bill(1);
+
+        // 预期毛利率为(150 - 100) / 150 = 50 / 150 = 0.3333333333333333
+        let cogs_2 = factory.cogs_of_25_rounds();
+        assert_eq!(cogs_2, 0.3333333333333333);
+
+        // 测试场景3：另一个正常情况，不同的收入和成本
+        let bill2 = factory.accountant.get_bill_or_default(2);
+        {
+            let mut bill_write = bill2.write();
+            bill_write.set_revenue(200.0);
+            bill_write.set_production_cost(50.0);
+        }
+
+        // 调用add_bill方法，确保moment被添加到moments列表中
+        factory.accountant.add_bill(2);
+
+        // 总账单收入：150 + 200 = 350
+        // 总账单生产成本：100 + 50 = 150
+        // 预期毛利率为(350 - 150) / 350 = 200 / 350 = 0.5714285714285714
+        let cogs_3 = factory.cogs_of_25_rounds();
+        assert_eq!(cogs_3, 0.5714285714285714);
     }
 }

@@ -103,7 +103,7 @@ impl Market {
                 // 获取本轮财务账单
                 let bill = factory.get_round_bill(round);
                 // 计算毛利率
-                let gross_margin = bill.get_cogs();
+                let gross_margin = factory.cogs_of_25_rounds();
                 // 获取工厂状态
                 let factory_status = format!("{:?}", factory.status());
                 let mut logger = LOGGER.write();
