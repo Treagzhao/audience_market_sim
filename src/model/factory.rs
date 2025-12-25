@@ -33,6 +33,7 @@ pub struct Factory {
     initial_stock: u16,
     risk_appetite: f64,
     status: FactoryStatus,
+    offer_price: f64,
 }
 
 impl Factory {
@@ -78,6 +79,7 @@ impl Factory {
             initial_stock: 0,
             risk_appetite: rng.gen_range(0.1..0.9),
             status: FactoryStatus::default(),
+            offer_price: 0.0,
         }
     }
 
@@ -108,6 +110,14 @@ impl Factory {
         *self.amount.get(&round).unwrap_or(&10) // 默认库存为10
     }
 
+    pub fn offer_price(&mut self) -> f64 {
+        let mut rng = rand::thread_rng();
+        let (lower, upper) = self.supply_price_range;
+        let price = rng.gen_range(lower..upper);
+        self.offer_price = price;
+        price
+    }
+
     /// 开始新一轮
     pub fn start_round(&mut self, round: u64) {
         let last_b = self.accountant.get_bill_or_default(round - 1);
@@ -121,9 +131,8 @@ impl Factory {
             let rate = 1.1 + 0.4 * self.risk_appetite;
             ((last_round_initial_stock as f64 * rate) as u16).max(last_round_initial_stock + 1)
         } else {
-            last_bill.total_production.max(1)
+            last_bill.units_sold.max(1)
         };
-        println!("prediction_production: {:?}", prediction_production);
         let production_under_budget = (self.cash * self.risk_appetite / self.product_cost) as u16;
         let need_production = prediction_production.min(production_under_budget);
 
@@ -1282,5 +1291,25 @@ mod tests {
         // 预期毛利率为(350 - 150) / 350 = 200 / 350 = 0.5714285714285714
         let cogs_3 = factory.cogs_of_25_rounds();
         assert_eq!(cogs_3, 0.5714285714285714);
+    }
+
+    #[test]
+    fn test_offer_price() {
+        let product = Product::from(
+            1,
+            "test_product".to_string(),
+            ProductCategory::Food,
+            0.5,
+            NormalDistribution::random(1, "test_price_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_elastic_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_cost_dist".to_string(), Some(0.0), Some(1.0)),
+        );
+
+        let mut factory = Factory::new(1, "Test Factory".to_string(), &product);
+        factory.supply_price_range = (10.0, 20.0);
+        for _ in 0..50 {
+            let price = factory.offer_price();
+            assert!(price >= 10.0 && price <= 20.0);
+        }
     }
 }
