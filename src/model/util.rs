@@ -1,3 +1,4 @@
+use std::ops::Range;
 use rand::Rng;
 
 /// 计算两个区间的交集
@@ -20,6 +21,18 @@ pub fn interval_intersection(interval1: (f64, f64), interval2: (f64, f64)) -> Op
     } else {
         None
     }
+}
+
+pub fn random_unrepeat_numbers_in_range(range:Range<usize>,n:usize) -> Vec<usize>{
+    let mut rng = rand::thread_rng();
+    let mut numbers = Vec::new();
+    while numbers.len() < n {
+        let num = rng.gen_range(range.clone());
+        if !numbers.contains(&num) {
+            numbers.push(num);
+        }
+    }
+    numbers
 }
 
 /// 生成随机范围
@@ -851,5 +864,24 @@ mod tests {
             "New range should be very small for very small shrink_rate: rate={}",
             rate
         );
+    }
+
+    #[test]
+    fn test_random_unrepeat_numbers_in_range(){
+        let range = (1usize..5usize);
+        let n = 3;
+        let numbers = random_unrepeat_numbers_in_range(range,n);
+        assert_eq!(numbers.len(),n);
+        for num in numbers{
+            assert!(num >= 1 && num < 5);
+        }
+
+        let range = (100usize..200usize);
+        let n = 30;
+        let numbers = random_unrepeat_numbers_in_range(range,n);
+        assert_eq!(numbers.len(),n);
+        for num in numbers{
+            assert!(num >= 100 && num < 200);
+        }
     }
 }

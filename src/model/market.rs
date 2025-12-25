@@ -1,16 +1,20 @@
+use std::cell::RefCell;
 use crate::logging::LOGGER;
 use crate::model::agent::{Agent, TradeResult};
 use crate::model::factory::Factory;
 use crate::model::product::Product;
+use crate::model::util::random_unrepeat_numbers_in_range;
 use parking_lot::RwLock;
 use rand::Rng;
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
+
 const MAX_ROUND: u64 = 8000;
 pub struct Market {
     factories: HashMap<u64, Arc<RwLock<Vec<Factory>>>>,
@@ -174,7 +178,7 @@ impl Market {
                 let agents = self.agents.clone();
                 let mut counter = round_trades.clone();
                 let h = thread::spawn(move || {
-                    println!("dealing product :{:?}", product_id);
+                    println!("dealing product :{:?} round:{:?}", product_id, round);
                     let count = process_product_trades(
                         current_timestamp,
                         products,
@@ -272,124 +276,142 @@ fn process_product_trades(
     // 获取工厂列表的Arc副本
     let mut factory_list_arc = factories.write();
     // 克隆Arc，以便在闭包中使用
-    let factory_list_arc_clone = factory_list_arc;
+    let mut factory_list = factory_list_arc;
     let agents_clone = agents.clone();
-    let product_clone = product.clone();
+    let agents = agents_clone.read();
+    let mut factory_borrow_list:Vec<Rc<RefCell<&Factory>>> = Vec::new();
+    for factory in factory_list.iter_mut() {
+        factory.start_round(round);
+        factory_borrow_list.push(Rc::new(RefCell::new(factory)));
+    }
+    for a in agents.iter() {
+        let agent = a.clone();
 
+    }
     // 在闭包中处理工厂交易
-    let local_trades = {
-        let mut local_count = 0;
+    // let local_trades = {
+    //     let mut local_count = 0;
+    //
+    //     // 遍历商品下的工厂
+    //     for factory in factory_list.iter_mut() {
+    //         // 让工厂开启一次循环
+    //
+    //
+    //         // 获取agents的可变锁
+    //         let mut agents = agents_clone.read();
+    //         // 让每个agent与工厂进行交易
+    //         for a in agents.iter() {
+    //             let (agent_id, agent_name) = {
+    //                 let agent = a.read();
+    //                 (agent.id(), agent.name().to_string())
+    //             };
+    //
+    //             // 检查工厂库存，如果为0则退出循环
+    //             if factory.get_stock(round) <= 0 {
+    //                 break;
+    //             }
+    //             let has_demand = {
+    //                 let agent = a.read();
+    //                 agent.has_demand(product_id)
+    //             };
+    //             let mut trade_result = TradeResult::NotYet;
+    //             let mut interval_relation = None;
+    //             if !has_demand {
+    //                 trade_result = TradeResult::NotMatched;
+    //             } else {
+    //                 let mut agent = a.write();
+    //                 // 调用agent的trade方法
+    //                 (trade_result, interval_relation) = agent.trade(factory, round);
+    //                 drop(agent);
+    //             }
+    //             // 将interval_relation转换为字符串
+    //             let interval_relation_str = match &interval_relation {
+    //                 Some(rel) => match rel {
+    //                     crate::model::agent::IntervalRelation::Overlapping(_) => "Overlapping",
+    //                     crate::model::agent::IntervalRelation::AgentBelowFactory => {
+    //                         "AgentBelowFactory"
+    //                     }
+    //                     crate::model::agent::IntervalRelation::AgentAboveFactory => {
+    //                         "AgentAboveFactory"
+    //                     }
+    //                 },
+    //                 None => "None",
+    //             };
+    //
+    //             // 调用工厂的deal方法
+    //             factory.deal(&trade_result, round, interval_relation);
+    //
+    //             // 如果交易成功，增加交易计数
+    //             if matches!(trade_result, crate::model::agent::TradeResult::Success(_)) {
+    //                 local_count += 1;
+    //             }
+    //             let (
+    //                 agent_cash,
+    //                 agent_pref_original_price,
+    //                 agent_pref_original_elastic,
+    //                 agent_pref_current_price,
+    //                 agent_pref_current_range_lower,
+    //                 agent_pref_current_range_upper,
+    //             ) = {
+    //                 let agent = a.read();
+    //                 let preferences_map = agent.preferences();
+    //                 let preferences = preferences_map.get(&product.product_category()).unwrap();
+    //                 if let Some(x) = preferences.get(&product_id) {
+    //                     (
+    //                         agent.cash(),
+    //                         x.original_price,
+    //                         x.original_elastic,
+    //                         x.current_price,
+    //                         x.current_range.0,
+    //                         x.current_range.1,
+    //                     )
+    //                 } else {
+    //                     (agent.cash(), 0.0, 0.0, 0.0, 0.0, 0.0)
+    //                 }
+    //             };
+    //             // 记录交易日志
+    //             let mut logger = LOGGER.write();
+    //             if let Err(e) = logger.log_trade(
+    //                 timestamp,
+    //                 round,
+    //                 0,
+    //                 agent_id,
+    //                 agent_name,
+    //                 agent_cash,
+    //                 agent_pref_original_price,
+    //                 agent_pref_original_elastic,
+    //                 agent_pref_current_price,
+    //                 agent_pref_current_range_lower,
+    //                 agent_pref_current_range_upper,
+    //                 factory,
+    //                 product,
+    //                 &trade_result,
+    //                 interval_relation_str,
+    //             ) {
+    //                 eprintln!("Failed to log trade: {}", e);
+    //             }
+    //         }
+    //     }
+    //
+    //     local_count
+    // };
 
-        // 获取工厂列表的读写锁
-        let mut factory_list = factory_list_arc_clone;
+    todo!()
+}
 
-        // 遍历商品下的工厂
-        for factory in factory_list.iter_mut() {
-            // 让工厂开启一次循环
-            factory.start_round(round);
-
-            // 获取agents的可变锁
-            let mut agents = agents_clone.read();
-            // 让每个agent与工厂进行交易
-            for a in agents.iter() {
-                let (agent_id, agent_name) = {
-                    let agent = a.read();
-                    (agent.id(), agent.name().to_string())
-                };
-
-                // 检查工厂库存，如果为0则退出循环
-                if factory.get_stock(round) <= 0 {
-                    break;
-                }
-                let has_demand = {
-                    let agent = a.read();
-                    agent.has_demand(product_id)
-                };
-                let mut trade_result = TradeResult::NotYet;
-                let mut interval_relation = None;
-                if !has_demand {
-                    trade_result = TradeResult::NotMatched;
-                } else {
-                    let mut agent = a.write();
-                    // 调用agent的trade方法
-                    (trade_result, interval_relation) = agent.trade(factory, round);
-                    drop(agent);
-                }
-                // 将interval_relation转换为字符串
-                let interval_relation_str = match &interval_relation {
-                    Some(rel) => match rel {
-                        crate::model::agent::IntervalRelation::Overlapping(_) => "Overlapping",
-                        crate::model::agent::IntervalRelation::AgentBelowFactory => {
-                            "AgentBelowFactory"
-                        }
-                        crate::model::agent::IntervalRelation::AgentAboveFactory => {
-                            "AgentAboveFactory"
-                        }
-                    },
-                    None => "None",
-                };
-
-                // 调用工厂的deal方法
-                factory.deal(&trade_result, round, interval_relation);
-
-                // 如果交易成功，增加交易计数
-                if matches!(trade_result, crate::model::agent::TradeResult::Success(_)) {
-                    local_count += 1;
-                }
-                let (
-                    agent_cash,
-                    agent_pref_original_price,
-                    agent_pref_original_elastic,
-                    agent_pref_current_price,
-                    agent_pref_current_range_lower,
-                    agent_pref_current_range_upper,
-                ) = {
-                    let agent = a.read();
-                    let preferences_map = agent.preferences();
-                    let preferences = preferences_map.get(&product.product_category()).unwrap();
-                    if let Some(x) = preferences.get(&product_id) {
-                        (
-                            agent.cash(),
-                            x.original_price,
-                            x.original_elastic,
-                            x.current_price,
-                            x.current_range.0,
-                            x.current_range.1,
-                        )
-                    } else {
-                        (agent.cash(), 0.0, 0.0, 0.0, 0.0, 0.0)
-                    }
-                };
-                // 记录交易日志
-                let mut logger = LOGGER.write();
-                if let Err(e) = logger.log_trade(
-                    timestamp,
-                    round,
-                    0,
-                    agent_id,
-                    agent_name,
-                    agent_cash,
-                    agent_pref_original_price,
-                    agent_pref_original_elastic,
-                    agent_pref_current_price,
-                    agent_pref_current_range_lower,
-                    agent_pref_current_range_upper,
-                    factory,
-                    product,
-                    &trade_result,
-                    interval_relation_str,
-                ) {
-                    eprintln!("Failed to log trade: {}", e);
-                }
-            }
-        }
-
-        local_count
-    };
-
-    trades_count = local_trades;
-
-    trades_count
+fn range_factory_list<'a>(factory_list: &mut Vec<Rc<RefCell<&'a mut Factory>>>) -> Vec<Rc<RefCell<&'a mut Factory>>> {
+    let n = factory_list.len().min(3);
+    let indexes = random_unrepeat_numbers_in_range(0..factory_list.len(), n);
+    let mut factories: Vec<Rc<RefCell<&'a mut Factory>>> = Vec::new();
+    for i in indexes {
+        factories.push(factory_list[i].clone());
+    }
+    factories.sort_by(|a, b| {
+        let mut a_ = a.borrow_mut();
+        let mut b_ = b.borrow_mut();
+        a_.offer_price().partial_cmp(&b_.offer_price()).unwrap()
+    });
+    factories
 }
 
 #[cfg(test)]
@@ -635,5 +657,63 @@ mod tests {
                 increase
             );
         }
+    }
+
+    #[test]
+    fn test_range_factory_list() {
+        // 创建一个简单的产品用于测试
+        let price_distribution =
+            NormalDistribution::new(100.0, 1, "test_price_dist".to_string(), 10.0);
+        let elastic_distribution =
+            NormalDistribution::new(1.0, 1, "test_elastic_dist".to_string(), 0.2);
+        let cost_distribution = NormalDistribution::new(80.0, 1, "test_cost_dist".to_string(), 5.0);
+
+        let product = Product::from(
+            1,
+            "Test Product".to_string(),
+            ProductCategory::from_str("Food"),
+            1.0,
+            price_distribution,
+            elastic_distribution,
+            cost_distribution,
+        );
+        let mut factory_list_org = vec![
+            Factory::new(1, "Factory 1".to_string(), &product),
+            Factory::new(2, "Factory 2".to_string(), &product),
+            Factory::new(3, "Factory 3".to_string(), &product),
+        ];
+        let mut factory_list = vec![
+            Rc::new(RefCell::new(&mut factory_list_org[0])),
+            Rc::new(RefCell::new(&mut factory_list_org[1])),
+            Rc::new(RefCell::new(&mut factory_list_org[2])),
+        ];
+
+        let factories = range_factory_list(&mut factory_list);
+        assert_eq!(factories.len(), 3);
+
+
+        let mut factory_list = vec![
+            Rc::new(RefCell::new(&mut factory_list_org[0])),
+            Rc::new(RefCell::new(&mut factory_list_org[1])),
+        ];
+        let factories = range_factory_list(&mut factory_list);
+        assert_eq!(factories.len(), 2);
+
+
+        let mut factory_list_org = vec![
+            Factory::new(1, "Factory 1".to_string(), &product),
+            Factory::new(2, "Factory 2".to_string(), &product),
+            Factory::new(3, "Factory 3".to_string(), &product),
+            Factory::new(4, "Factory 4".to_string(), &product),
+            Factory::new(5, "Factory 5".to_string(), &product),
+            Factory::new(6, "Factory 6".to_string(), &product),
+        ];
+        let mut factory_list = vec![
+        ];
+        for i in 0..factory_list_org.len() {
+            factory_list.push(Rc::new(RefCell::new(&mut factory_list_org[i])));
+        }
+        let factories = range_factory_list(&mut factory_list);
+        assert_eq!(factories.len(), 3);
     }
 }
