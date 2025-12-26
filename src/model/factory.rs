@@ -110,11 +110,10 @@ impl Factory {
         *self.amount.get(&round).unwrap_or(&10) // 默认库存为10
     }
 
-    pub fn offer_price(&mut self) -> f64 {
+    pub fn offer_price(&self) -> f64 {
         let mut rng = rand::thread_rng();
         let (lower, upper) = self.supply_price_range;
         let price = rng.gen_range(lower..upper);
-        self.offer_price = price;
         price
     }
 
@@ -1308,7 +1307,8 @@ mod tests {
         let mut factory = Factory::new(1, "Test Factory".to_string(), &product);
         factory.supply_price_range = (10.0, 20.0);
         for _ in 0..50 {
-            let price = factory.offer_price();
+            let f = &factory;
+            let price = f.offer_price();
             assert!(price >= 10.0 && price <= 20.0);
         }
     }
