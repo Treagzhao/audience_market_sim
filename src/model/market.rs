@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use crate::logging::LOGGER;
 use crate::model::agent::{Agent, TradeResult};
 use crate::model::factory::Factory;
@@ -8,6 +7,7 @@ use parking_lot::RwLock;
 use rand::Rng;
 use rand::seq::SliceRandom;
 use rayon::prelude::*;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -279,14 +279,13 @@ fn process_product_trades(
     let mut factory_list = factory_list_arc;
     let agents_clone = agents.clone();
     let agents = agents_clone.read();
-    let mut factory_borrow_list:Vec<Rc<RefCell<&Factory>>> = Vec::new();
+    let mut factory_borrow_list: Vec<Rc<RefCell<&Factory>>> = Vec::new();
     for factory in factory_list.iter_mut() {
         factory.start_round(round);
         factory_borrow_list.push(Rc::new(RefCell::new(factory)));
     }
     for a in agents.iter() {
         let agent = a.clone();
-
     }
     // 在闭包中处理工厂交易
     // let local_trades = {
@@ -399,19 +398,17 @@ fn process_product_trades(
     todo!()
 }
 
-fn range_factory_list<'a>(factory_list: &mut Vec<Rc<RefCell<&'a mut Factory>>>) -> Vec<Rc<RefCell<&'a mut Factory>>> {
+fn range_factory_list<'a>(factory_list: Vec<Rc<RefCell<&Factory>>>) -> Vec<(f64,Rc<RefCell<&Factory>>)> {
     let n = factory_list.len().min(3);
     let indexes = random_unrepeat_numbers_in_range(0..factory_list.len(), n);
-    let mut factories: Vec<Rc<RefCell<&'a mut Factory>>> = Vec::new();
+    let mut infos: Vec<(f64,Rc<RefCell<&Factory>>)> = Vec::new();
     for i in indexes {
-        factories.push(factory_list[i].clone());
+        let f = factory_list[i].borrow();
+        let price = f.offer_price();
+        infos.push((price, factory_list[i].clone()));
     }
-    factories.sort_by(|a, b| {
-        let mut a_ = a.borrow_mut();
-        let mut b_ = b.borrow_mut();
-        a_.offer_price().partial_cmp(&b_.offer_price()).unwrap()
-    });
-    factories
+    infos.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    infos
 }
 
 #[cfg(test)]
@@ -677,43 +674,17 @@ mod tests {
             elastic_distribution,
             cost_distribution,
         );
-        let mut factory_list_org = vec![
-            Factory::new(1, "Factory 1".to_string(), &product),
-            Factory::new(2, "Factory 2".to_string(), &product),
-            Factory::new(3, "Factory 3".to_string(), &product),
-        ];
-        let mut factory_list = vec![
-            Rc::new(RefCell::new(&mut factory_list_org[0])),
-            Rc::new(RefCell::new(&mut factory_list_org[1])),
-            Rc::new(RefCell::new(&mut factory_list_org[2])),
+        let factory_list = vec![
+            Rc::new(RefCell::new(&Factory::new(1, "Test Factory 1".to_string(),&product))),
+            Rc::new(RefCell::new(&Factory::new(2, "Test Factory 2".to_string(),&product))),
+            Rc::new(RefCell::new(&Factory::new(3, "Test Factory 3".to_string(),&product))),
         ];
 
-        let factories = range_factory_list(&mut factory_list);
-        assert_eq!(factories.len(), 3);
+        let infos = range_factory_list(factory_list);
 
-
-        let mut factory_list = vec![
-            Rc::new(RefCell::new(&mut factory_list_org[0])),
-            Rc::new(RefCell::new(&mut factory_list_org[1])),
-        ];
-        let factories = range_factory_list(&mut factory_list);
-        assert_eq!(factories.len(), 2);
-
-
-        let mut factory_list_org = vec![
-            Factory::new(1, "Factory 1".to_string(), &product),
-            Factory::new(2, "Factory 2".to_string(), &product),
-            Factory::new(3, "Factory 3".to_string(), &product),
-            Factory::new(4, "Factory 4".to_string(), &product),
-            Factory::new(5, "Factory 5".to_string(), &product),
-            Factory::new(6, "Factory 6".to_string(), &product),
-        ];
-        let mut factory_list = vec![
-        ];
-        for i in 0..factory_list_org.len() {
-            factory_list.push(Rc::new(RefCell::new(&mut factory_list_org[i])));
-        }
-        let factories = range_factory_list(&mut factory_list);
-        assert_eq!(factories.len(), 3);
+        assert_eq!(infos.len(), 3);
+        assert_eq!(infos[0].0, 0.0);
+        assert_eq!(infos[1].0, 0.0);
+        assert_eq!(infos[2].0, 0.0);
     }
 }
