@@ -361,6 +361,9 @@ fn get_range_change_ratio(interval_relation: Option<IntervalRelation>) -> f64 {
             IntervalRelation::AgentAboveFactory => {
                 ratio = 0.01;
             }
+            IntervalRelation::CashBurnedOut => {
+                ratio = 0.0;
+            }
         }
     }
     ratio
@@ -730,7 +733,7 @@ mod tests {
         factory.deal(
             &TradeResult::Failed,
             test_round,
-            Some(IntervalRelation::Overlapping((100.0, 200.0))),
+            Some(IntervalRelation::Overlapping((100.0))),
         );
         // 更新剩余库存
         factory.remaining_stock -= 1;
@@ -922,7 +925,7 @@ mod tests {
 
         // 情况2: Overlapping关系，应该返回-0.01
         let ratio_overlapping =
-            get_range_change_ratio(Some(IntervalRelation::Overlapping((10.0, 20.0))));
+            get_range_change_ratio(Some(IntervalRelation::Overlapping((10.0))));
         assert_eq!(ratio_overlapping, -0.01);
 
         // 情况3: AgentBelowFactory关系，应该返回-0.01
@@ -932,6 +935,10 @@ mod tests {
         // 情况4: AgentAboveFactory关系，应该返回0.01
         let ratio_above = get_range_change_ratio(Some(IntervalRelation::AgentAboveFactory));
         assert_eq!(ratio_above, 0.01);
+
+        // 情况5: CashBurnedOut关系，应该返回0.0
+        let ratio_burned_out = get_range_change_ratio(Some(IntervalRelation::CashBurnedOut));
+        assert_eq!(ratio_burned_out, 0.0);
     }
 
     #[test]

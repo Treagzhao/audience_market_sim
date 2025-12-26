@@ -272,6 +272,7 @@ fn process_product_trades(
         return 0;
     }
     let product = p.unwrap();
+    let product_category = product.product_category();
     // 查找产品
     // 获取工厂列表的Arc副本
     let mut factory_list_arc = factories.write();
@@ -285,7 +286,16 @@ fn process_product_trades(
         factory_borrow_list.push(Rc::new(RefCell::new(factory)));
     }
     for a in agents.iter() {
-        let agent = a.clone();
+        let ag = a.clone();
+        let agent = ag.read();
+        if !agent.has_demand(product_id) {
+            continue;
+        }
+        let potential_factories = range_factory_list(factory_borrow_list.clone());
+        let mut deal_index: Option<usize> = None;
+        for (i,(price,factory)) in potential_factories.iter().enumerate() {
+            let (result,interval_relation) = agent.negotiate(round, product_id, product_category, *price);
+        }
     }
     // 在闭包中处理工厂交易
     // let local_trades = {
@@ -398,10 +408,12 @@ fn process_product_trades(
     todo!()
 }
 
-fn range_factory_list<'a>(factory_list: Vec<Rc<RefCell<&Factory>>>) -> Vec<(f64,Rc<RefCell<&Factory>>)> {
+fn range_factory_list<'a>(
+    factory_list: Vec<Rc<RefCell<&Factory>>>,
+) -> Vec<(f64, Rc<RefCell<&Factory>>)> {
     let n = factory_list.len().min(3);
     let indexes = random_unrepeat_numbers_in_range(0..factory_list.len(), n);
-    let mut infos: Vec<(f64,Rc<RefCell<&Factory>>)> = Vec::new();
+    let mut infos: Vec<(f64, Rc<RefCell<&Factory>>)> = Vec::new();
     for i in indexes {
         let f = factory_list[i].borrow();
         let price = f.offer_price();
@@ -674,17 +686,49 @@ mod tests {
             elastic_distribution,
             cost_distribution,
         );
+        let factory1 = Factory::new(1, "Test Factory 1".to_string(), &product);
+        let factory2 = Factory::new(2, "Test Factory 2".to_string(), &product);
+        let factory3 = Factory::new(3, "Test Factory 3".to_string(), &product);
         let factory_list = vec![
-            Rc::new(RefCell::new(&Factory::new(1, "Test Factory 1".to_string(),&product))),
-            Rc::new(RefCell::new(&Factory::new(2, "Test Factory 2".to_string(),&product))),
-            Rc::new(RefCell::new(&Factory::new(3, "Test Factory 3".to_string(),&product))),
+            Rc::new(RefCell::new(&factory1)),
+            Rc::new(RefCell::new(&factory2)),
+            Rc::new(RefCell::new(&factory3)),
         ];
 
         let infos = range_factory_list(factory_list);
 
         assert_eq!(infos.len(), 3);
-        assert_eq!(infos[0].0, 0.0);
-        assert_eq!(infos[1].0, 0.0);
-        assert_eq!(infos[2].0, 0.0);
+        let mut base_price = infos[0].0;
+        println!("{:?}", base_price);
+        for i in 1..infos.len() {
+            println!("{:?}", infos[i].0);
+            assert!(infos[i].0 >= base_price);
+            base_price = infos[i].0;
+        }
+
+        let factory1 = Factory::new(1, "Test Factory 1".to_string(), &product);
+        let factory2 = Factory::new(2, "Test Factory 2".to_string(), &product);
+        let factory3 = Factory::new(3, "Test Factory 3".to_string(), &product);
+        let factory4 = Factory::new(4, "Test Factory 4".to_string(), &product);
+        let factory5 = Factory::new(5, "Test Factory 5".to_string(), &product);
+        let factory6 = Factory::new(6, "Test Factory 6".to_string(), &product);
+        let factory_list = vec![
+            Rc::new(RefCell::new(&factory1)),
+            Rc::new(RefCell::new(&factory2)),
+            Rc::new(RefCell::new(&factory3)),
+            Rc::new(RefCell::new(&factory4)),
+            Rc::new(RefCell::new(&factory5)),
+            Rc::new(RefCell::new(&factory6)),
+        ];
+        let infos = range_factory_list(factory_list);
+
+        assert_eq!(infos.len(), 3);
+        let mut base_price = infos[0].0;
+        println!("{:?}", base_price);
+        for i in 1..infos.len() {
+            println!("{:?}", infos[i].0);
+            assert!(infos[i].0 >= base_price);
+            base_price = infos[i].0;
+        }
     }
 }
