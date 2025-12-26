@@ -517,16 +517,16 @@ mod tests {
         factory.cash = 100000.0;
         factory.product_cost = 1.0;
 
-        // 新的逻辑：有剩余库存时，保持稳定产量
+        // 新的逻辑：有剩余库存时，prediction_production = last_sales
         let current_round = 2;
         factory.start_round(current_round);
         let actual_initial_stock = factory.amount.get(&current_round).unwrap();
 
-        // 预期：上一轮剩余库存 + 上一轮总产量
-        let expected_initial_stock = last_remaining_stock + 100;
+        // 预期：上一轮剩余库存 + 上一轮销量
+        let expected_initial_stock = last_remaining_stock + 80;
         assert_eq!(
             *actual_initial_stock, expected_initial_stock,
-            "Branch 3.1: When there is remaining stock, should keep stable production"
+            "Branch 3.1: When there is remaining stock, should produce based on last sales"
         );
     }
 
@@ -551,16 +551,16 @@ mod tests {
         factory.cash = 100000.0;
         factory.product_cost = 1.0;
 
-        // 新的逻辑：有剩余库存时，保持稳定产量
+        // 新的逻辑：有剩余库存时，prediction_production = last_sales
         let current_round = 2;
         factory.start_round(current_round);
         let actual_initial_stock = factory.amount.get(&current_round).unwrap();
 
-        // 预期：上一轮剩余库存 + 上一轮总产量
-        let expected_initial_stock = last_remaining_stock + 50;
+        // 预期：上一轮剩余库存 + 上一轮销量
+        let expected_initial_stock = last_remaining_stock + 10;
         assert_eq!(
             *actual_initial_stock, expected_initial_stock,
-            "Branch 3.2: When there is remaining stock, should keep stable production"
+            "Branch 3.2: When there is remaining stock, should produce based on last sales"
         );
     }
 
@@ -589,11 +589,11 @@ mod tests {
         factory.start_round(current_round);
         let actual_initial_stock = factory.amount.get(&current_round).unwrap();
 
-        // 预期：上一轮剩余库存 + 上一轮总产量
-        let expected_initial_stock = last_remaining_stock + 100;
+        // 预期：上一轮剩余库存 + 上一轮销量
+        let expected_initial_stock = last_remaining_stock + 80;
         assert_eq!(
             *actual_initial_stock, expected_initial_stock,
-            "Branch 4.1: When budget is sufficient, should keep stable production"
+            "Branch 4.1: When budget is sufficient, should produce based on last sales"
         );
     }
 
