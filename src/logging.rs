@@ -192,14 +192,23 @@ impl Logger {
         product_category: String,
         old_range: (f64, f64),
         new_range: (f64, f64),
-        lower_change: f64,
-        upper_change: f64,
-        min_change_ratio: f64,
-        max_change_ratio: f64,
-        center: f64,
         adjustment_type: &str,
         price: Option<f64>,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        let lower_change = new_range.0 - old_range.0;
+        let upper_change = new_range.1 - old_range.1;
+        let min_change_ratio = if old_range.0 != 0.0 {
+            lower_change / old_range.0
+        } else {
+            0.0
+        };
+        let max_change_ratio = if old_range.1 != 0.0 {
+            upper_change  / old_range.1
+        } else {
+            0.0
+        };
+        let center = (new_range.0 + new_range.1) / 2.0;
+
         let sql = log_agent_range_adjustment(
             round,
             self.task_id.clone(),
@@ -428,11 +437,6 @@ mod tests {
                 "category".to_string(),
                 (0.1, 0.2),
                 (0.3, 0.4),
-                0.5,
-                0.6,
-                0.7,
-                0.8,
-                0.9,
                 "adjustment_type",
                 Some(1.0),
             )
