@@ -237,13 +237,15 @@ impl Agent {
                 gen_new_range_with_price(preference.current_price, preference.current_range, 0.2);
         } else if lower_count > 0 {
             new_range = shift_range_by_ratio(preference.current_range, -0.1);
+            new_range = gen_new_range_with_price(preference.current_price, new_range, 0.1);
         } else if above_count > 0 {
             new_range = shift_range_by_ratio(preference.current_range, 0.1);
+            new_range = gen_new_range_with_price(preference.current_price, new_range, 0.1);
         } else {
             new_range = preference.current_range;
         }
         self.set_preference_detail(product_category, product_id, None, Some(new_range));
-        
+
     }
 
     fn set_preference_detail(
