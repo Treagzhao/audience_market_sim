@@ -1,6 +1,6 @@
 use crate::model::product::Product;
 use rand::Rng;
-
+#[derive(Clone,Debug)]
 pub struct Preference {
     pub original_price: f64,
     pub original_elastic: f64,
