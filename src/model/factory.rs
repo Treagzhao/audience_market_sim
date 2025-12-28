@@ -6,7 +6,7 @@ use crate::model::agent::{IntervalRelation, TradeResult};
 use crate::model::factory::accountant::Accountant;
 use crate::model::factory::financial_bill::FinancialBill;
 use crate::model::product::{Product, ProductCategory};
-use crate::model::util::shift_range_by_ratio;
+use crate::model::util::{round_to_nearest_cent, shift_range_by_ratio};
 use rand::Rng;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, LinkedList};
@@ -107,14 +107,25 @@ impl Factory {
     }
 
     pub fn get_stock(&self, round: u64) -> u16 {
-        *self.amount.get(&round).unwrap_or(&10) // 默认库存为10
+        *self.amount.get(&round).unwrap_or(&0) // 默认库存为10
     }
 
-    pub fn offer_price(&self) -> f64 {
+    pub fn get_factory_status(&self) -> FactoryStatus {
+        self.status
+    }
+
+    pub fn offer_price(&self, round: u64) -> f64 {
+        if self.status == FactoryStatus::BrokeUp {
+            return 0.0;
+        }
+        let stock = self.get_stock(round);
+        if stock == 0 {
+            return 0.0;
+        }
         let mut rng = rand::thread_rng();
         let (lower, upper) = self.supply_price_range;
         let price = rng.gen_range(lower..upper);
-        price
+        round_to_nearest_cent(price)
     }
 
     /// 开始新一轮
@@ -367,6 +378,13 @@ fn get_range_change_ratio(interval_relation: Option<IntervalRelation>) -> f64 {
         }
     }
     ratio
+}
+
+#[cfg(test)]
+impl Factory {
+    pub fn set_stock(&mut self, round: u64, stock: u16) {
+        self.amount.insert(round, stock);
+    }
 }
 
 #[cfg(test)]
@@ -924,8 +942,7 @@ mod tests {
         assert_eq!(ratio_none, -0.01);
 
         // 情况2: Overlapping关系，应该返回-0.01
-        let ratio_overlapping =
-            get_range_change_ratio(Some(IntervalRelation::Overlapping((10.0))));
+        let ratio_overlapping = get_range_change_ratio(Some(IntervalRelation::Overlapping((10.0))));
         assert_eq!(ratio_overlapping, -0.01);
 
         // 情况3: AgentBelowFactory关系，应该返回-0.01
@@ -1313,11 +1330,58 @@ mod tests {
 
         let mut factory = Factory::new(1, "Test Factory".to_string(), &product);
         factory.supply_price_range = (10.0, 20.0);
+        // 启动一轮，确保工厂有库存
+        factory.start_round(1);
         for _ in 0..50 {
             let f = &factory;
-            let price = f.offer_price();
+            let price = f.offer_price(1);
             assert!(price >= 10.0 && price <= 20.0);
         }
+    }
+
+    #[test]
+    fn test_offer_price_broke_up_factory() {
+        let product = Product::from(
+            1,
+            "test_product".to_string(),
+            ProductCategory::Food,
+            0.5,
+            NormalDistribution::random(1, "test_price_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_elastic_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_cost_dist".to_string(), Some(0.0), Some(1.0)),
+        );
+
+        let mut factory = Factory::new(1, "Test Factory".to_string(), &product);
+        factory.supply_price_range = (10.0, 20.0);
+        // 启动一轮，确保工厂有库存
+        factory.start_round(1);
+        // 设置工厂状态为破产
+        factory.status = FactoryStatus::BrokeUp;
+        // 破产工厂应该返回0.0
+        let price = factory.offer_price(1);
+        assert_eq!(price, 0.0);
+    }
+
+    #[test]
+    fn test_offer_price_zero_stock() {
+        let product = Product::from(
+            1,
+            "test_product".to_string(),
+            ProductCategory::Food,
+            0.5,
+            NormalDistribution::random(1, "test_price_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_elastic_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_cost_dist".to_string(), Some(0.0), Some(1.0)),
+        );
+
+        let mut factory = Factory::new(1, "Test Factory".to_string(), &product);
+        factory.supply_price_range = (10.0, 20.0);
+        // 启动一轮，但设置库存为0
+        factory.start_round(1);
+        *factory.amount.get_mut(&1).unwrap() = 0;
+        // 库存为0的工厂应该返回0.0
+        let price = factory.offer_price(1);
+        assert_eq!(price, 0.0);
     }
 
     #[test]
@@ -1336,5 +1400,23 @@ mod tests {
         factory.supply_price_range = (10.0, 20.0);
         let initial_stock = factory.get_initial_stock();
         assert!(initial_stock >= 0);
+    }
+
+    #[test]
+    fn test_get_factory_status() {
+        let product = Product::from(
+            1,
+            "test_product".to_string(),
+            ProductCategory::Food,
+            0.5,
+            NormalDistribution::random(1, "test_price_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_elastic_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_cost_dist".to_string(), Some(0.0), Some(1.0)),
+        );
+
+        let mut factory = Factory::new(1, "Test Factory".to_string(), &product);
+        factory.supply_price_range = (10.0, 20.0);
+        let status = factory.get_factory_status();
+        assert_eq!(status, FactoryStatus::Active);
     }
 }
