@@ -89,17 +89,31 @@ impl Logger {
     pub fn new(_file_path: &str, task_id: String) -> Result<Self, Box<dyn std::error::Error>> {
         init_mysql_client();
         let (tx, rx) = mpsc::sync_channel::<String>(30);
-        thread::spawn(move || {
-            let pool = MYSQL_POOL.get().unwrap();
-            let mut conn = pool.get_conn().expect("Failed to get connection from pool");
 
-            for sql in rx {
-                let res = conn.query_drop(&sql);
-                if let Err(e) = res {
-                    eprintln!("Error executing SQL: {}", e);
+        // 在测试环境中，不创建真实的日志处理线程，避免MySQL连接问题
+        #[cfg(not(test))]
+        thread::spawn(move || {
+            if let Some(pool) = MYSQL_POOL.get() {
+                if let Ok(mut conn) = pool.get_conn() {
+                    for sql in rx {
+                        let res = conn.query_drop(&sql);
+                        if let Err(e) = res {
+                            eprintln!("Error executing SQL: {}", e);
+                        }
+                    }
                 }
             }
         });
+
+        // 在测试环境中，只创建一个简单的接收线程，不执行真实的SQL操作
+        #[cfg(test)]
+        thread::spawn(move || {
+            // 简单地消耗掉通道中的消息，不执行任何操作
+            for _ in rx {
+                // 测试环境中不执行真实的SQL操作
+            }
+        });
+
         Ok(Logger { task_id, tx })
     }
 
@@ -203,7 +217,7 @@ impl Logger {
             0.0
         };
         let max_change_ratio = if old_range.1 != 0.0 {
-            upper_change  / old_range.1
+            upper_change / old_range.1
         } else {
             0.0
         };
