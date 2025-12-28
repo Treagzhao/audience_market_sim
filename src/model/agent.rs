@@ -118,7 +118,7 @@ impl Agent {
                 ProductCategory::Entertainment,
             ];
             loop {
-                let wait_time = rng.gen_range(100..500);
+                let wait_time = rng.gen_range(50..200);
                 thread::sleep(Duration::from_millis(wait_time));
                 let preferences_map = p.read();
                 let mut new_demand: Vec<u64> = Vec::new();

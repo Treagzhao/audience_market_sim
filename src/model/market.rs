@@ -50,7 +50,7 @@ impl Market {
         }
         println!("before agent created");
         // 生成100个消费者，每个消费者初始有10万块钱
-        for agent_id in 1..=100 {
+        for agent_id in 1..=300 {
             let agent = Agent::new(
                 agent_id,
                 format!("Consumer_{}", agent_id),
@@ -146,7 +146,7 @@ impl Market {
         let mut agents = self.agents.write();
         agents.iter_mut().for_each(|agent| {
             let mut a = agent.write();
-            a.income((800.0, 1200.0));
+            a.income((200.0, 500.0));
         });
     }
 
@@ -225,7 +225,7 @@ impl Market {
                 break;
             }
             round += 1;
-            thread::sleep(std::time::Duration::from_millis(100));
+            thread::sleep(std::time::Duration::from_millis(50));
         }
     }
 
