@@ -350,98 +350,22 @@ impl Agent {
     pub fn settling(
         &mut self,
         factory: &Factory,
+        product_id: u64,
+        product_category: ProductCategory,
         round: u64,
         result: TradeResult,
         interval_relation: IntervalRelation,
         offered_prices: Vec<f64>,
-    ) -> (TradeResult, Option<IntervalRelation>) {
-        // let has_demand = self.has_demand(factory.product_id());
-        // if !has_demand {
-        //     return (TradeResult::NotMatched, None);
-        // }
-        // let interval_relation = self.match_factory(factory);
-        // let product_id = factory.product_id();
-        //
-        // match interval_relation {
-        //     IntervalRelation::Overlapping(range) => {
-        //         let price = gen_price_in_range(range, self.cash);
-        //         if price.is_none() {
-        //             self.handle_trade_failure(factory, product_id, round, false);
-        //             return (TradeResult::Failed, Some(interval_relation));
-        //         }
-        //         self.remove_demand(
-        //             product_id,
-        //             factory.product_category(),
-        //             round,
-        //             "successful_trade",
-        //         );
-        //         let price = price.unwrap();
-        //         self.cash -= price;
-        //         let mut preferences_map = self.preferences.write();
-        //         let preferences = preferences_map
-        //             .get_mut(&factory.product_category())
-        //             .unwrap();
-        //         let preference = preferences.get_mut(&product_id).unwrap();
-        //         preference.current_price = price;
-        //         let (new_min, new_max) =
-        //             gen_new_range_with_price(price, preference.current_range, 0.9);
-        //         let (old_min, old_max) = preference.current_range;
-        //         // 计算变化量，如果小于0.01，则不更新
-        //         let min_change = (new_min - old_min).abs();
-        //         let max_change = (new_max - old_max).abs();
-        //
-        //         if min_change >= 0.01 || max_change >= 0.01 {
-        //             // 计算变化比例（基于原范围长度）
-        //             let old_length = old_max - old_min;
-        //             let min_change_value = new_min - old_min;
-        //             let max_change_value = new_max - old_max;
-        //             let min_change_ratio = if old_length > 0.0 {
-        //                 min_change_value / old_length
-        //             } else {
-        //                 0.0
-        //             };
-        //             let max_change_ratio = if old_length > 0.0 {
-        //                 max_change_value / old_length
-        //             } else {
-        //                 0.0
-        //             };
-        //             let mut logger = LOGGER.write();
-        //             // 调用日志记录函数
-        //             if let Err(e) = logger.log_agent_range_adjustment(
-        //                 round, // 使用传入的round参数
-        //                 self.id(),
-        //                 self.name().to_string(),
-        //                 product_id,
-        //                 format!("{:?}", factory.product_category()),
-        //                 (old_min, old_max),
-        //                 (new_min, new_max),
-        //                 min_change_value,
-        //                 max_change_value,
-        //                 min_change_ratio,
-        //                 max_change_ratio,
-        //                 price, // 交易成功，以成交价格为中心
-        //                 "trade_success",
-        //                 Some(price), // 交易成功，有价格
-        //             ) {
-        //                 eprintln!("Failed to log agent range adjustment: {}", e);
-        //             }
-        //
-        //             preference.current_range = (new_min, new_max);
-        //         }
-        //         return (TradeResult::Success(price), Some(interval_relation));
-        //     }
-        //     IntervalRelation::AgentBelowFactory => {
-        //         // 代理价格低于工厂，商家售价太高，上移3%
-        //         self.handle_trade_failure(factory, product_id, round, true);
-        //         return (TradeResult::Failed, Some(interval_relation));
-        //     }
-        //     IntervalRelation::AgentAboveFactory => {
-        //         // 代理价格高于工厂，商家售价太低，下移3%
-        //         self.handle_trade_failure(factory, product_id, round, false);
-        //         return (TradeResult::Failed, Some(interval_relation));
-        //     }
-        // }
-        todo!()
+    ) {
+        match result {
+            TradeResult::Success(dealed_price) => {
+                self.handle_trade_success(round, product_id, product_category, factory, dealed_price);
+            }
+            TradeResult::Failed => {
+                self.remove_demand(product_id, product_category, round, "trade_failed");
+            }
+            _ => {}
+        }
     }
 }
 
