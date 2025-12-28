@@ -165,7 +165,7 @@ impl Market {
             let factories = &self.factories;
             // 获取产品ID列表
             let product_ids: Vec<u64> = self.products.iter().map(|p| p.id()).collect();
-            let mut handles: Vec<JoinHandle<_>> = Vec::new();
+          //  let mut handles: Vec<JoinHandle<_>> = Vec::new();
             let round_trades: Arc<RwLock<u64>> = Arc::new(RwLock::new(0));
             for i in 0..product_ids.len() {
                 let product_id = product_ids[i];
@@ -177,7 +177,6 @@ impl Market {
                 let f_list = f.unwrap().clone();
                 let agents = self.agents.clone();
                 let mut counter = round_trades.clone();
-                let h = thread::spawn(move || {
                     println!("dealing product :{:?} round:{:?}", product_id, round);
                     let count = process_product_trades(
                         current_timestamp,
@@ -189,14 +188,12 @@ impl Market {
                     );
                     let mut c = counter.write();
                     *c += count;
-                });
-                handles.push(h);
             }
 
-            // 等待所有线程完成
-            for h in handles {
-                h.join().expect("error ");
-            }
+            // // 等待所有线程完成
+            // for h in handles {
+            //     h.join().expect("error ");
+            // }
 
             // 汇总本轮交易数
             let current_round_trades = {
