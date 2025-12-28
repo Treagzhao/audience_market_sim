@@ -1319,4 +1319,22 @@ mod tests {
             assert!(price >= 10.0 && price <= 20.0);
         }
     }
+
+    #[test]
+    fn test_get_initial_stock() {
+        let product = Product::from(
+            1,
+            "test_product".to_string(),
+            ProductCategory::Food,
+            0.5,
+            NormalDistribution::random(1, "test_price_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_elastic_dist".to_string(), Some(0.0), Some(1.0)),
+            NormalDistribution::random(1, "test_cost_dist".to_string(), Some(0.0), Some(1.0)),
+        );
+
+        let mut factory = Factory::new(1, "Test Factory".to_string(), &product);
+        factory.supply_price_range = (10.0, 20.0);
+        let initial_stock = factory.get_initial_stock();
+        assert!(initial_stock >= 0);
+    }
 }
