@@ -11,7 +11,9 @@ use mysql::prelude::{TextQuery, WithParams};
 use parking_lot::RwLock;
 use rand::Rng;
 use rand::prelude::SliceRandom;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -28,7 +30,7 @@ pub struct Agent {
 }
 
 /// 区间关系枚举，表示两个区间之间的关系
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 pub enum IntervalRelation {
     /// 区间重叠，包含重叠范围
     Overlapping(f64),
@@ -41,7 +43,7 @@ pub enum IntervalRelation {
 }
 
 /// 交易结果枚举
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 pub enum TradeResult {
     NotYet,
     /// 未匹配到合适的交易对手
@@ -153,7 +155,7 @@ impl Agent {
             return (TradeResult::NotMatched, IntervalRelation::AgentBelowFactory);
         }
         if self.cash < price {
-            return (TradeResult::Failed, IntervalRelation::CashBurnedOut);
+            return (TradeResult::Failed, IntervalRelation::AgentBelowFactory);
         }
         let pg = self.preferences.read();
 
@@ -199,11 +201,9 @@ impl Agent {
     /// - 如果为false，表示代理价格高于工厂或余额不足，需要下移范围
     fn handle_trade_failure(
         &mut self,
-        factory: &Factory,
         product_id: u64,
         product_category: ProductCategory,
         round: u64,
-        interval_relation: IntervalRelation,
         offered_price: Vec<f64>,
     ) {
         // 根据1-preference.elastic的概率决定是否删除demand
@@ -215,9 +215,6 @@ impl Agent {
         let random_value = rng.gen_range(0.0..1.0);
         if random_value < delete_probability {
             self.remove_demand(product_id, product_category, round, "remove_by_elasticity");
-            return;
-        }
-        if interval_relation == IntervalRelation::CashBurnedOut {
             return;
         }
         let mut above_count = 0;
@@ -296,21 +293,25 @@ impl Agent {
         round: u64,
         product_id: u64,
         product_category: ProductCategory,
-        factory: &Factory,
         price: f64,
     ) {
-        let mut preferences_map = self.preferences.write();
-        let mut preferences = preferences_map.get_mut(&product_category).unwrap();
-        let mut preference = preferences.get_mut(&product_id).unwrap();
-        let old_range = preference.current_range;
-        preference.current_price = price;
-        self.cash -= price;
-        let old_length = old_range.1 - old_range.0;
-        let min_len = (price * 0.05).max(0.1); // 至少保留 5% 的模糊空间
-        let new_length = (old_length * 0.9).max(min_len);
-        let new_lower = (price - new_length / 2.0).max(0.00);
-        let mut new_upper = (price + new_length / 2.0).max(0.00).max(new_lower + 0.1);
-        preference.current_range = (new_lower, new_upper);
+        {
+            let mut preferences_map = self.preferences.write();
+            let mut preferences = preferences_map.get_mut(&product_category).unwrap();
+            let mut preference = preferences.get_mut(&product_id).unwrap();
+            let old_range = preference.current_range;
+            preference.current_price = price;
+            self.cash -= price;
+            let old_length = old_range.1 - old_range.0;
+            let min_len = (price * 0.05).max(0.1); // 至少保留 5% 的模糊空间
+            let new_length = (old_length * 0.9).max(min_len);
+            let new_lower = (price - new_length / 2.0).max(0.00);
+            let new_upper = (price + new_length / 2.0).max(0.00).max(new_lower + 0.1);
+            preference.current_range = (new_lower, new_upper);
+        } // 在此处，preferences_map超出作用域，释放对self.preferences的借用
+
+        // 交易成功后移除需求
+        self.remove_demand(product_id, product_category, round, "trade_success");
     }
 
     fn remove_demand(
@@ -349,20 +350,18 @@ impl Agent {
 
     pub fn settling(
         &mut self,
-        factory: &Factory,
         product_id: u64,
         product_category: ProductCategory,
         round: u64,
         result: TradeResult,
-        interval_relation: IntervalRelation,
         offered_prices: Vec<f64>,
     ) {
         match result {
             TradeResult::Success(dealed_price) => {
-                self.handle_trade_success(round, product_id, product_category, factory, dealed_price);
+                self.handle_trade_success(round, product_id, product_category, dealed_price);
             }
             TradeResult::Failed => {
-                self.remove_demand(product_id, product_category, round, "trade_failed");
+                self.handle_trade_failure(product_id, product_category, round, offered_prices);
             }
             _ => {}
         }
@@ -373,6 +372,27 @@ impl Agent {
 impl Agent {
     pub fn set_cash(&mut self, cash: f64) {
         self.cash = cash;
+    }
+
+    pub fn set_demand(&mut self, product_id: u64, has_demand: bool) {
+        let mut demand = self.demand.write();
+        if has_demand {
+            demand.insert(product_id, true);
+        } else {
+            demand.remove(&product_id);
+        }
+    }
+
+    pub fn set_preference_range(
+        &mut self,
+        product_id: u64,
+        product_category: ProductCategory,
+        range: (f64, f64),
+    ) {
+        let mut preferences = self.preferences.write();
+        let mut inner_map = preferences.entry(product_category).or_default();
+        let preference = inner_map.get_mut(&product_id).unwrap();
+        preference.current_range = range;
     }
 }
 
@@ -937,7 +957,7 @@ mod tests {
         );
         assert_eq!(
             interval_relation,
-            IntervalRelation::CashBurnedOut,
+            IntervalRelation::AgentBelowFactory,
             "Interval relation should be Overlapping when price is within range"
         );
     }
@@ -1074,11 +1094,9 @@ mod tests {
 
         // 调用handle_trade_failure方法
         agent.handle_trade_failure(
-            &factory,
             product_id,
             product_category,
             0,
-            IntervalRelation::AgentBelowFactory,
             vec![100.0], // 高于上限的价格
         );
 
@@ -1104,11 +1122,9 @@ mod tests {
 
         // 调用handle_trade_failure方法
         agent.handle_trade_failure(
-            &factory,
             product_id,
             product_category,
             0,
-            IntervalRelation::AgentBelowFactory,
             vec![100.0], // 高于上限的价格
         );
 
@@ -1142,11 +1158,9 @@ mod tests {
 
         // 调用handle_trade_failure方法
         agent.handle_trade_failure(
-            &factory,
             product_id,
             product_category,
             0,
-            IntervalRelation::CashBurnedOut,
             vec![50.0], // 任何价格
         );
 
@@ -1179,11 +1193,9 @@ mod tests {
 
         // 调用handle_trade_failure方法
         agent.handle_trade_failure(
-            &factory,
             product_id,
             product_category,
             0,
-            IntervalRelation::AgentBelowFactory,
             vec![5.0, 100.0], // 既有低于下限又有高于上限的价格
         );
 
@@ -1206,11 +1218,9 @@ mod tests {
 
         // 调用handle_trade_failure方法
         agent.handle_trade_failure(
-            &factory,
             product_id,
             product_category,
             0,
-            IntervalRelation::AgentAboveFactory,
             vec![5.0, 8.0], // 只有低于下限的价格
         );
 
@@ -1233,11 +1243,9 @@ mod tests {
 
         // 调用handle_trade_failure方法
         agent.handle_trade_failure(
-            &factory,
             product_id,
             product_category,
             0,
-            IntervalRelation::AgentBelowFactory,
             vec![100.0, 120.0], // 只有高于上限的价格
         );
 
@@ -1260,11 +1268,9 @@ mod tests {
 
         // 调用handle_trade_failure方法
         agent.handle_trade_failure(
-            &factory,
             product_id,
             product_category,
             0,
-            IntervalRelation::Overlapping(50.0),
             vec![50.0, 60.0], // 所有价格都在范围内
         );
 
@@ -1290,7 +1296,7 @@ mod tests {
         let price = 1.0; // 1.0 * 0.05 = 0.05 < 0.1，所以min_len应该取0.1
 
         // 调用handle_trade_success方法
-        agent.handle_trade_success(0, product_id, product_category, &factory, price);
+        agent.handle_trade_success(0, product_id, product_category, price);
 
         // 验证结果
         assert_eq!(agent.cash(), 99.0, "Cash should decrease by price");
@@ -1323,7 +1329,7 @@ mod tests {
         let price = 10.0; // 10.0 * 0.05 = 0.5 >= 0.1，所以min_len应该取0.5
 
         // 调用handle_trade_success方法
-        agent.handle_trade_success(0, product_id, product_category, &factory, price);
+        agent.handle_trade_success(0, product_id, product_category, price);
 
         // 验证结果
         assert_eq!(agent.cash(), 90.0, "Cash should decrease by price");
@@ -1355,7 +1361,7 @@ mod tests {
         let price = 50.0;
 
         // 调用handle_trade_success方法
-        agent.handle_trade_success(0, product_id, product_category, &factory, price);
+        agent.handle_trade_success(0, product_id, product_category, price);
 
         // 验证结果
         assert_eq!(agent.cash(), 50.0, "Cash should decrease by price");
@@ -1387,7 +1393,7 @@ mod tests {
         let price = 50.0;
 
         // 调用handle_trade_success方法
-        agent.handle_trade_success(0, product_id, product_category, &factory, price);
+        agent.handle_trade_success(0, product_id, product_category, price);
 
         // 验证结果
         assert_eq!(agent.cash(), 50.0, "Cash should decrease by price");
@@ -1420,7 +1426,7 @@ mod tests {
         let price = 0.1;
 
         // 调用handle_trade_success方法
-        agent.handle_trade_success(0, product_id, product_category, &factory, price);
+        agent.handle_trade_success(0, product_id, product_category, price);
 
         // 验证结果
         let preference = agent.get_specific_preference(product_id, product_category);
@@ -1448,7 +1454,7 @@ mod tests {
         let price = 50.0;
 
         // 调用handle_trade_success方法
-        agent.handle_trade_success(0, product_id, product_category, &factory, price);
+        agent.handle_trade_success(0, product_id, product_category, price);
 
         // 验证结果
         let preference = agent.get_specific_preference(product_id, product_category);
@@ -1479,7 +1485,7 @@ mod tests {
         let price = 0.0;
 
         // 调用handle_trade_success方法
-        agent.handle_trade_success(0, product_id, product_category, &factory, price);
+        agent.handle_trade_success(0, product_id, product_category, price);
 
         // 验证结果
         let preference = agent.get_specific_preference(product_id, product_category);
@@ -1507,7 +1513,7 @@ mod tests {
         let price = 50.0;
 
         // 调用handle_trade_success方法
-        agent.handle_trade_success(0, product_id, product_category, &factory, price);
+        agent.handle_trade_success(0, product_id, product_category, price);
 
         // 验证结果
         let preference = agent.get_specific_preference(product_id, product_category);
