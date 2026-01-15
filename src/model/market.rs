@@ -50,7 +50,7 @@ impl Market {
         }
         println!("before agent created");
         // 生成100个消费者，每个消费者初始有10万块钱
-        for agent_id in 1..=300 {
+        for agent_id in 1..=500 {
             let agent = Agent::new(
                 agent_id,
                 format!("Consumer_{}", agent_id),

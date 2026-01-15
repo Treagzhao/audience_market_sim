@@ -380,7 +380,6 @@ fn get_range_change_ratio(interval_relation: Option<IntervalRelation>) -> f64 {
     ratio
 }
 
-#[cfg(test)]
 impl Factory {
     pub fn set_stock(&mut self, round: u64, stock: u16) {
         self.amount.insert(round, stock);
