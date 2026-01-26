@@ -2,7 +2,7 @@ use crate::logging::LOGGER;
 use crate::model::agent::{Agent, IntervalRelation, TradeResult};
 use crate::model::factory::{Factory, FactoryStatus};
 use crate::model::product::{Product, ProductCategory};
-use crate::model::util::random_unrepeat_numbers_in_range;
+use crate::model::math::random_unrepeat_numbers_in_range;
 use parking_lot::RwLock;
 use rand::Rng;
 use rand::seq::SliceRandom;

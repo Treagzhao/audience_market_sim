@@ -6,7 +6,7 @@ use crate::model::agent::{IntervalRelation, TradeResult};
 use crate::model::factory::accountant::Accountant;
 use crate::model::factory::financial_bill::FinancialBill;
 use crate::model::product::{Product, ProductCategory};
-use crate::model::util::{round_to_nearest_cent, shift_range_by_ratio};
+use crate::model::math::{round_to_nearest_cent, shift_range_by_ratio};
 use rand::Rng;
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, LinkedList};

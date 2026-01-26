@@ -2,7 +2,7 @@ use crate::logging::LOGGER;
 use crate::model::agent::preference::Preference;
 use crate::model::factory::Factory;
 use crate::model::product::{Product, ProductCategory};
-use crate::model::util::{
+use crate::model::math::{
     gen_new_range_with_price, gen_price_in_range, interval_intersection, round_to_nearest_cent,
     shift_range_by_ratio,
 };
