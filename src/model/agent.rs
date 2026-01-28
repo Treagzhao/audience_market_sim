@@ -20,7 +20,7 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 
 mod preference;
-
+#[derive(Clone,Debug)]
 pub struct Agent {
     id: u64,
     name: String,

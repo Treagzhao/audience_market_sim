@@ -1,20 +1,26 @@
 use crate::model::product::Product;
 use rand::Rng;
+use crate::model::agent::Agent;
+
 #[derive(Clone,Debug)]
 pub struct Preference {
     pub original_price: f64,
     pub original_elastic: f64,
     pub(crate) current_price: f64,
     pub(crate) current_range: (f64, f64),
+    agent:Agent
 }
 
 impl Preference {
     pub fn new(original_price: f64, original_elastic: f64) -> Self {
+        let products:Vec<Product> = vec![];
+        let agent = Agent::new(1231,"sdfds".to_string(),1.2,&products,false);
         Preference {
             original_price,
             original_elastic,
             current_price: 0.0,
             current_range: (0.0, 0.0),
+            agent
         }
     }
 
@@ -38,12 +44,15 @@ impl Preference {
         // 上限范围：下限到base_max
         let max = rng.gen_range(min..base_max);
         let current_range = (min, max);
+        let products:Vec<Product> = vec![];
+        let agent = Agent::new(1231,"sdfds".to_string(),1.2,&products,false);
 
         Preference {
             original_price,
             original_elastic,
             current_price: original_price,
             current_range,
+            agent
         }
     }
 }
