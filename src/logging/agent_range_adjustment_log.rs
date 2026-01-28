@@ -1,4 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
+use crate::model::agent::Agent;
+use crate::model::product::Product;
 
 // Agent范围调整日志结构体
 pub struct AgentRangeAdjustmentLog {
@@ -20,6 +22,7 @@ pub struct AgentRangeAdjustmentLog {
     pub center: f64,
     pub adjustment_type: String, // "trade_success" 或 "trade_failed"
     pub price: Option<f64>,      // 仅在交易成功时有值
+    agent:Agent
 }
 
 impl AgentRangeAdjustmentLog {
@@ -44,12 +47,14 @@ impl AgentRangeAdjustmentLog {
             .duration_since(UNIX_EPOCH)
             .expect("Failed to get system time")
             .as_millis() as i64;
-
+        let products:Vec<Product> = vec![];
+        let agent = Agent::new(agent_id, agent_name.clone(), 100.0, &products, false);
         AgentRangeAdjustmentLog {
             timestamp,
             round,
             task_id,
             agent_id,
+            agent,
             agent_name,
             product_id,
             product_category,
