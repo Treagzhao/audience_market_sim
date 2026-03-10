@@ -4,14 +4,14 @@
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/logging.rs,331
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/logging/agent_cash_log.rs,57
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/logging/agent_demand_removal_log.rs,133
-/Users/treagzhao/Documents/Workspace/austrian_market_sim/src/logging/agent_range_adjustment_log.rs,136
+/Users/treagzhao/Documents/Workspace/austrian_market_sim/src/logging/agent_range_adjustment_log.rs,142
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/logging/factory_end_of_round_log.rs,205
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/logging/factory_range_optimization_log.rs,129
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/logging/trade_log.rs,166
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/main.rs,154
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/model.rs,0
-/Users/treagzhao/Documents/Workspace/austrian_market_sim/src/model/agent.rs,392
-/Users/treagzhao/Documents/Workspace/austrian_market_sim/src/model/agent/preference.rs,46
+/Users/treagzhao/Documents/Workspace/austrian_market_sim/src/model/agent.rs,393
+/Users/treagzhao/Documents/Workspace/austrian_market_sim/src/model/agent/preference.rs,54
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/model/factory.rs,347
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/model/factory/accountant.rs,60
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/model/factory/financial_bill.rs,70
@@ -20,4 +20,4 @@
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/model/product.rs,108
 /Users/treagzhao/Documents/Workspace/austrian_market_sim/src/util.rs,0
 
-总有效代码行数,2981
+总有效代码行数,2996
