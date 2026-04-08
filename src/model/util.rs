@@ -1,3 +1,4 @@
+use std::ops::Range;
 use rand::Rng;
 
 /// 计算两个区间的交集
@@ -20,6 +21,18 @@ pub fn interval_intersection(interval1: (f64, f64), interval2: (f64, f64)) -> Op
     } else {
         None
     }
+}
+
+pub fn random_unrepeat_numbers_in_range(range:Range<usize>,n:usize) -> Vec<usize>{
+    let mut rng = rand::thread_rng();
+    let mut numbers = Vec::new();
+    while numbers.len() < n {
+        let num = rng.gen_range(range.clone());
+        if !numbers.contains(&num) {
+            numbers.push(num);
+        }
+    }
+    numbers
 }
 
 /// 生成随机范围
@@ -323,6 +336,120 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_random_range_max_less_than_min() {
+        // 测试max <= min的情况
+        // 情况1: max < min
+        for _ in 0..100 {
+            let (min, max) = generate_random_range(10.0, 5.0);
+            assert!(min >= 0.0, "min should be non-negative: {}", min);
+            assert!(
+                max > min,
+                "max should be greater than min: {} > {}",
+                max,
+                min
+            );
+            assert!(max <= 5.0, "max should be <= 5.0: {}", max);
+        }
+
+        // 情况2: max == min
+        for _ in 0..100 {
+            let (min, max) = generate_random_range(5.0, 5.0);
+            assert!(min >= 0.0, "min should be non-negative: {}", min);
+            assert!(
+                max > min,
+                "max should be greater than min: {} > {}",
+                max,
+                min
+            );
+            assert!(max <= 5.0, "max should be <= 5.0: {}", max);
+        }
+    }
+
+    #[test]
+    fn test_generate_random_range_max_possible_min_less_than_min() {
+        // 测试max_possible_min <= min的情况
+        // 当max * 0.5 <= min时，应该使用min作为下限
+        for _ in 0..100 {
+            // 选择参数使得max * 0.5 <= min
+            let min = 60.0;
+            let max = 100.0;
+            let (range_min, range_max) = generate_random_range(min, max);
+            assert!(
+                range_min >= min,
+                "range_min should be >= min when max * 0.5 <= min: {} >= {}",
+                range_min,
+                min
+            );
+            assert!(range_min >= 0.0, "range_min should be non-negative: {}", range_min);
+            assert!(
+                range_max > range_min,
+                "range_max should be greater than range_min: {} > {}",
+                range_max,
+                range_min
+            );
+            assert!(range_max <= max, "range_max should be <= max: {} <= {}", range_max, max);
+        }
+    }
+
+    #[test]
+    fn test_generate_random_range_range_max_less_than_final_min() {
+        // 测试range_max <= final_min的情况
+        // 这种情况可能发生在max_possible_min <= min且max接近min时
+        for _ in 0..100 {
+            // 选择参数使得生成的range_max可能小于final_min
+            let min = 5.0;
+            let max = 5.0001;
+            let (range_min, range_max) = generate_random_range(min, max);
+            assert!(range_min >= 0.0, "range_min should be non-negative: {}", range_min);
+            assert!(
+                range_max > range_min,
+                "range_max should be greater than range_min: {} > {}",
+                range_max,
+                range_min
+            );
+            assert!(range_max <= max, "range_max should be <= max: {} <= {}", range_max, max);
+        }
+    }
+
+    #[test]
+    fn test_generate_random_range_edge_cases() {
+        // 测试各种边界情况
+        let test_cases = vec![
+            (0.0, 0.0),      // max = 0.0
+            (0.0, 0.01),      // 非常小的范围
+            (0.0, 1.0),       // 标准小范围
+            (1.0, 1.0),       // max = min
+            (0.5, 1.0),       // 小范围，max_possible_min = 0.5
+            (0.6, 1.0),       // 小范围，max_possible_min < min
+            (100.0, 200.0),   // 正常范围
+            (200.0, 100.0),   // max < min
+        ];
+
+        for (min, max) in test_cases {
+            for _ in 0..10 {
+                let (range_min, range_max) = generate_random_range(min, max);
+                // 验证基本条件
+                assert!(range_min >= 0.0, "min should be non-negative: {} >= 0.0", range_min);
+                assert!(
+                    range_max > range_min,
+                    "max should be greater than min: {} > {}",
+                    range_max,
+                    range_min
+                );
+                // 对于max <= min的情况，函数会生成max.max(0.01)作为上限
+                // 所以需要特殊处理这个情况
+                let expected_max_limit = if max <= min {
+                    // 与函数逻辑保持一致
+                    max.max(0.01)
+                } else {
+                    max
+                };
+                assert!(range_max <= expected_max_limit, "max should be <= expected limit: {} <= {}", range_max, expected_max_limit);
+            }
+        }
+    }
+
+    #[test]
     fn test_gen_price_in_range() {
         // 测试正常情况：生成的价格≤现金
         for _ in 0..100 {
@@ -553,7 +680,6 @@ mod tests {
                 "Result should be Some when cash is sufficient"
             );
             let price = result.unwrap();
-            println!("price:{:?} string:{:?}", price, format!("{:.20}", price));
             // 验证价格是两位小数
             let decimal_places = format!("{:.20}", price)
                 .split('.')
@@ -738,5 +864,24 @@ mod tests {
             "New range should be very small for very small shrink_rate: rate={}",
             rate
         );
+    }
+
+    #[test]
+    fn test_random_unrepeat_numbers_in_range(){
+        let range = (1usize..5usize);
+        let n = 3;
+        let numbers = random_unrepeat_numbers_in_range(range,n);
+        assert_eq!(numbers.len(),n);
+        for num in numbers{
+            assert!(num >= 1 && num < 5);
+        }
+
+        let range = (100usize..200usize);
+        let n = 30;
+        let numbers = random_unrepeat_numbers_in_range(range,n);
+        assert_eq!(numbers.len(),n);
+        for num in numbers{
+            assert!(num >= 100 && num < 200);
+        }
     }
 }

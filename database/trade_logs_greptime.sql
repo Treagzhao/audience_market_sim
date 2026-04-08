@@ -13,6 +13,7 @@ CREATE TABLE trade_logs (
     factory_name STRING,             -- 工厂名称
     product_id BIGINT INVERTED INDEX,               -- 产品ID
     product_name STRING,             -- 产品名称
+    product_category STRING INVERTED INDEX,         -- 产品类别
     trade_result STRING,             -- 交易结果（Success/Failed/NotMatched/NotYet）
     interval_relation STRING,        -- 区间关系（Overlapping/AgentBelowFactory/AgentAboveFactory）
     

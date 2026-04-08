@@ -1,7 +1,7 @@
 use rand::Rng;
 use rand_distr::Normal;
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct NormalDistribution {
     mean: f64,
     id: u64,
@@ -54,7 +54,6 @@ impl NormalDistribution {
     pub fn sample(&self, range: Option<(f64, f64)>) -> f64 {
         let mut rng = rand::thread_rng();
         let normal = Normal::new(self.mean, self.std_dev).unwrap();
-
         match range {
             Some((min, max)) => {
                 // 重复生成样本，直到在指定范围内
