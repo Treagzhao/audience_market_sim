@@ -17,7 +17,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tokio::io::AsyncWriteExt;
 
 mod preference;
 
@@ -139,6 +138,18 @@ impl Agent {
         });
     }
 
+    pub fn start_ubi_thread(self_arc: Arc<RwLock<Agent>>) {
+        thread::spawn(move || {
+            let mut rng = rand::thread_rng();
+            loop {
+                let sleep_ms = rng.gen_range(500..2000);
+                thread::sleep(Duration::from_millis(sleep_ms));
+                let mut agent = self_arc.write();
+                agent.income((200.0, 500.0));
+            }
+        });
+    }
+
     pub fn has_demand(&self, product_id: u64) -> bool {
         let demand = self.demand.read();
         demand.contains_key(&product_id)
@@ -146,7 +157,7 @@ impl Agent {
 
     pub fn negotiate(
         &self,
-        round: u64,
+        tick: u64,
         product_id: u64,
         product_category: ProductCategory,
         price: f64,

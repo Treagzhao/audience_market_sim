@@ -80,7 +80,7 @@ impl TradeLog {
             price: price.unwrap_or(-1.0),
             factory_supply_range_lower: lower,
             factory_supply_range_upper: upper,
-            factory_stock: factory.get_stock(round),
+            factory_stock: factory.stock,
             agent_pref_original_price,
             agent_pref_original_elastic,
             agent_pref_current_price,
